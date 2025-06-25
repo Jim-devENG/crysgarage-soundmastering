@@ -44,14 +44,13 @@ function Knob({ value, min, max, onChange, label }: { value: number; min: number
   );
 }
 
-export default function EQSection({ bands = Array(8).fill(0), onBandChange = () => {}, knobs = [50, 50, 50], onKnobChange = () => {}, toggles = [false, false, false, false], onToggle = () => {} }: EQSectionProps) {
+export default function EQSection({ bands = Array(8).fill(0), onBandChange = () => {}, knobs = [50, 50], onKnobChange = () => {}, toggles = [false], onToggle = () => {} }: EQSectionProps) {
   return (
     <div className="rounded-2xl p-4 bg-white/10 backdrop-blur-md shadow-xl flex flex-col items-center w-full max-w-xl mx-auto">
       {/* Dials */}
       <div className="flex justify-center gap-8 mb-4">
         <Knob value={knobs[0]} min={0} max={100} onChange={v => onKnobChange(0, v)} label="VOL" />
         <Knob value={knobs[1]} min={0} max={100} onChange={v => onKnobChange(1, v)} label="EQ" />
-        <Knob value={knobs[2]} min={0} max={100} onChange={v => onKnobChange(2, v)} label="BOOST" />
       </div>
       {/* EQ Sliders */}
       <div className="flex gap-3 justify-center items-end mb-4">
@@ -70,23 +69,11 @@ export default function EQSection({ bands = Array(8).fill(0), onBandChange = () 
           </div>
         ))}
       </div>
-      {/* Toggles */}
-      <div className="flex flex-wrap gap-8 mt-2 justify-center">
+      {/* Bass Toggle - Centered */}
+      <div className="flex justify-center mt-2">
         <label className="flex items-center gap-2 cursor-pointer">
           <span className="text-xs text-gray-300">Bass</span>
           <input type="checkbox" checked={toggles[0]} onChange={e => onToggle(0, e.target.checked)} className="accent-blue-500 w-5 h-5" />
-        </label>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <span className="text-xs text-gray-300">3D Effect</span>
-          <input type="checkbox" checked={toggles[1]} onChange={e => onToggle(1, e.target.checked)} className="accent-green-500 w-5 h-5" />
-        </label>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <span className="text-xs text-gray-300">Stereo Width</span>
-          <input type="checkbox" checked={toggles[2]} onChange={e => onToggle(2, e.target.checked)} className="accent-purple-500 w-5 h-5" />
-        </label>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <span className="text-xs text-gray-300">Target Loudness</span>
-          <input type="checkbox" checked={toggles[3]} onChange={e => onToggle(3, e.target.checked)} className="accent-yellow-500 w-5 h-5" />
         </label>
       </div>
     </div>

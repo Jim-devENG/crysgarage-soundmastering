@@ -137,6 +137,9 @@ interface LocalSettings {
   noise_reduction: boolean;
   bass_boost: number;
   presence_boost: number;
+  boost_enabled: boolean;
+  stereo_width_enabled: boolean;
+  target_loudness_enabled: boolean;
 }
 
 function toMasteringSettings(local: LocalSettings) {
@@ -202,13 +205,13 @@ function clamp(value: number, min: number, max: number) {
 }
 
 // Add SimpleDropdown component
-function SimpleDropdown({ onSelect, disabled }) {
+function SimpleDropdown({ onSelect, disabled }: { onSelect: (format: string) => void; disabled: boolean }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    function handleClickOutside(event) {
-      if (ref.current && !ref.current.contains(event.target)) setOpen(false);
+    function handleClickOutside(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -299,7 +302,10 @@ export default function CustomMasteringDashboard({ audioFile }: CustomMasteringD
     },
     noise_reduction: false,
     bass_boost: 3,
-    presence_boost: 2
+    presence_boost: 2,
+    boost_enabled: false,
+    stereo_width_enabled: false,
+    target_loudness_enabled: false
   })
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
@@ -778,7 +784,7 @@ export default function CustomMasteringDashboard({ audioFile }: CustomMasteringD
           const res = await fetch(`/api/audio/${audioFile.id}/status`);
           const data = await res.json();
           if (data?.data?.mastered_path) {
-            setAudioFile((prev: any) => ({ ...prev, mastered_path: data.data.mastered_path }));
+            // Note: In a real app, you'd want to update this through a callback prop
             setIsPolling(false);
           }
           if (data?.data?.error_message) {
@@ -1178,10 +1184,27 @@ export default function CustomMasteringDashboard({ audioFile }: CustomMasteringD
                       />
                     </div>
                   </div>
+                  
+                  {/* Boost Control */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-white">Boost Enhancement</Label>
+                      <Switch
+                        checked={settings.boost_enabled || false}
+                        onCheckedChange={(checked) => updateSettings({ boost_enabled: checked })}
+                      />
+                    </div>
+                  </div>
                 </div>
                 {/* Stereo Width Section */}
                 <div className="space-y-4">
-                  <CardTitle className="text-white">Stereo Width</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-white">Stereo Width</CardTitle>
+                    <Switch
+                      checked={settings.stereo_width_enabled || false}
+                      onCheckedChange={(checked) => updateSettings({ stereo_width_enabled: checked })}
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label className="text-white">Stereo Width: {settings.stereo_width}%</Label>
                     <Slider
@@ -1196,7 +1219,13 @@ export default function CustomMasteringDashboard({ audioFile }: CustomMasteringD
                 </div>
                 {/* Target Loudness Section */}
                 <div className="space-y-4">
-                  <CardTitle className="text-white">Target Loudness</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-white">Target Loudness</CardTitle>
+                    <Switch
+                      checked={settings.target_loudness_enabled || false}
+                      onCheckedChange={(checked) => updateSettings({ target_loudness_enabled: checked })}
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label className="text-white">Target Loudness</Label>
                     <Slider
