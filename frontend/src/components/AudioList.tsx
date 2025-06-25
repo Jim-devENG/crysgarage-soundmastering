@@ -34,7 +34,7 @@ export default function AudioList() {
   const loadFiles = async (page: number) => {
     try {
       setLoading(true)
-      const response = await audioApi.getAudioFiles(page)
+      const response = await audioApi.getAudioFiles()
       setFiles(response.data)
       setPagination(response.pagination)
     } catch (err) {

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
+import { Music, Zap } from 'lucide-react'
 
 interface MasteringOptionsProps {
   onApply: (settings: MasteringSettings) => void
@@ -48,6 +49,19 @@ const QUALITY_OPTIONS = [
   { value: 'high', label: 'High Quality', description: 'Best quality, slower processing' },
 ]
 
+const defaultSettings: MasteringSettings = {
+  target_loudness: -10,
+  genre_preset: 'pop',
+  processing_quality: 'standard',
+  stereo_width: 15,
+  bass_boost: 3,
+  presence_boost: 2,
+  dynamic_range: 'compressed',
+  high_freq_enhancement: true,
+  low_freq_enhancement: true,
+  noise_reduction: false
+}
+
 export default function MasteringOptions({ onApply, loading = false }: MasteringOptionsProps) {
   const [settings, setSettings] = useState<MasteringSettings>({
     target_loudness: -14,
@@ -72,12 +86,41 @@ export default function MasteringOptions({ onApply, loading = false }: Mastering
 
   return (
     <div className="space-y-6">
-      {/* AI Mastering Settings */}
-      <Card>
+      {/* Automatic Mastery */}
+      <Card className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 border-blue-500/30">
         <CardHeader>
-          <CardTitle className="text-lg">AI Mastering Settings</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Zap className="text-yellow-400" />
+            Automatic Mastery
+          </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
+          {/* Genre Preset - More Prominent */}
+          <div className="space-y-3">
+            <Label className="text-base font-medium flex items-center gap-2">
+              <Music className="w-4 h-4" />
+              Select Genre for Mastering
+            </Label>
+            <Select value={settings.genre_preset} onValueChange={(value) => handleSettingChange('genre_preset', value)}>
+              <SelectTrigger className="h-12 text-base">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {GENRE_PRESETS.map((preset) => (
+                  <SelectItem key={preset.value} value={preset.value}>
+                    <div>
+                      <div className="font-medium">{preset.label}</div>
+                      <div className="text-xs text-gray-500">{preset.description}</div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-gray-400">
+              Choose the genre that best matches your track. This will apply genre-specific mastering settings automatically.
+            </p>
+          </div>
+          
           {/* Target Loudness */}
           <div className="space-y-2">
             <Label>Target Loudness: {settings.target_loudness} dB</Label>
@@ -95,27 +138,7 @@ export default function MasteringOptions({ onApply, loading = false }: Mastering
               <span>-8 dB (Loud)</span>
             </div>
           </div>
-
-          {/* Genre Preset */}
-          <div className="space-y-2">
-            <Label>Genre Preset</Label>
-            <Select value={settings.genre_preset} onValueChange={(value) => handleSettingChange('genre_preset', value)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {GENRE_PRESETS.map((preset) => (
-                  <SelectItem key={preset.value} value={preset.value}>
-                    <div>
-                      <div className="font-medium">{preset.label}</div>
-                      <div className="text-xs text-gray-500">{preset.description}</div>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
+          
           {/* Processing Quality */}
           <div className="space-y-2">
             <Label>Processing Quality</Label>

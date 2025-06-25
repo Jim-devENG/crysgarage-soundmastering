@@ -17,8 +17,8 @@ class EQProcessor
     public function __construct()
     {
         $this->tempDirectory = config('audio.eq_processing.temp_directory', storage_path('app/temp/eq'));
-        $this->maxGainDb = config('audio.eq_processing.max_gain_db', 12);
-        $this->minGainDb = config('audio.eq_processing.min_gain_db', -12);
+        $this->maxGainDb = config('audio.eq_processing.max_gain_db', 18);
+        $this->minGainDb = config('audio.eq_processing.min_gain_db', -18);
         $this->sampleRate = 44100; // Standard sample rate
         $this->channels = 2; // Stereo
         

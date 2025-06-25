@@ -2,9 +2,11 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 
 export default function Home() {
   const [mounted, setMounted] = useState(false)
+  const { data: session } = useSession()
 
   useEffect(() => {
     setMounted(true)
@@ -22,8 +24,16 @@ export default function Home() {
           <span className="text-3xl font-extrabold text-white tracking-tight">Crysgarage</span>
         </div>
         <div className="space-x-4">
+          {session ? (
+            <Link href="/ai-mastering" className="text-white hover:text-red-400 font-medium transition">
+              AI Mastering
+            </Link>
+          ) : (
+            <>
           <Link href="/login" className="text-white hover:text-red-400 font-medium transition">Sign In</Link>
           <Link href="/signup" className="text-white hover:text-red-400 font-medium transition">Sign Up</Link>
+            </>
+          )}
         </div>
       </nav>
 
@@ -36,12 +46,22 @@ export default function Home() {
           Master your sound with Crysgarage. Upload, process, and perfect your audio files with our advanced AI-powered mastering tools.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          {session ? (
+            <Link href="/ai-mastering">
+              <span className="inline-block px-8 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold text-lg shadow-lg transition">
+                Start AI Mastering
+              </span>
+            </Link>
+          ) : (
+            <>
           <Link href="/login">
             <span className="inline-block px-8 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold text-lg shadow-lg transition">Sign In</span>
           </Link>
           <Link href="/signup">
             <span className="inline-block px-8 py-3 rounded-lg bg-white text-red-700 font-semibold text-lg shadow-lg border border-red-600 hover:bg-red-50 transition">Sign Up</span>
           </Link>
+            </>
+          )}
         </div>
       </main>
 

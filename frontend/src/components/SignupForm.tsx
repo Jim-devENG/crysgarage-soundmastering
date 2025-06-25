@@ -2,126 +2,177 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-
-const signupSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-})
-
-type SignupForm = z.infer<typeof signupSchema>
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Loader2, Mail, Lock, User } from 'lucide-react'
+import Link from 'next/link'
 
 export default function SignupForm() {
-  const router = useRouter()
-  const [loading, setLoading] = useState(false)
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const router = useRouter()
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<SignupForm>({
-    resolver: zodResolver(signupSchema),
-  })
-
-  const onSubmit = async (data: SignupForm) => {
-    setLoading(true)
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
     setError('')
+    setSuccess('')
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match')
+      setIsLoading(false)
+      return
+    }
 
     try {
-      const response = await fetch('/api/auth/register', {
+      const response = await fetch('/api/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+        }),
       })
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Something went wrong')
-      }
+      const data = await response.json()
 
-      router.push('/login?registered=true')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong')
+      if (!response.ok) {
+        setError(data.error || 'Registration failed')
+      } else {
+        setSuccess('Registration successful! Redirecting to AI Mastering...')
+        setTimeout(() => {
+          router.push('/ai-mastering')
+        }, 2000)
+      }
+    } catch (error) {
+      setError('An error occurred. Please try again.')
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
   return (
-    <div className="w-full max-w-md mx-auto p-8">
-      <div className="bg-gray-800/60 rounded-2xl shadow-2xl p-8 border border-gray-700/50">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Create Account</h1>
-          <p className="text-gray-400">Join us today</p>
-        </div>
-
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-indigo-900 to-red-900 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md bg-white/10 backdrop-blur-sm border-white/20">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-bold text-white">Create Account</CardTitle>
+          <CardDescription className="text-gray-300">
+            Join Crysgarage and start mastering your audio
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="mb-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">
-              Name
-            </label>
-            <input
-              id="name"
-              {...register('name')}
-              className="w-full px-4 py-3 rounded-lg bg-gray-700/50 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
-              placeholder="Enter your name"
-            />
-            {errors.name && (
-              <p className="mt-1 text-sm text-red-400">{errors.name.message}</p>
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
+            
+            {success && (
+              <Alert className="bg-green-500/10 border-green-500/20 text-green-400">
+                <AlertDescription>{success}</AlertDescription>
+              </Alert>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="name" className="text-white">Full Name</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Enter your full name"
+                  className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-gray-400"
+                  required
+                />
+              </div>
           </div>
 
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
-              Email Address
-            </label>
-            <input
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-white">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
               id="email"
               type="email"
-              {...register('email')}
-              className="w-full px-4 py-3 rounded-lg bg-gray-700/50 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter your email"
+                  className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-gray-400"
+                  required
             />
-            {errors.email && (
-              <p className="mt-1 text-sm text-red-400">{errors.email.message}</p>
-            )}
+              </div>
           </div>
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
-              Password
-            </label>
-            <input
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-white">Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
               id="password"
               type="password"
-              {...register('password')}
-              className="w-full px-4 py-3 rounded-lg bg-gray-700/50 border border-gray-600 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
               placeholder="Create a password"
-            />
-            {errors.password && (
-              <p className="mt-1 text-sm text-red-400">{errors.password.message}</p>
-            )}
+                  className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-gray-400"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword" className="text-white">Confirm Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm your password"
+                  className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-gray-400"
+                  required
+                />
+              </div>
           </div>
 
-          <button
+            <Button
             type="submit"
-            disabled={loading}
-            className="w-full py-3 px-4 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Creating account...' : 'Create account'}
-          </button>
+              className="w-full bg-red-600 hover:bg-red-700 text-white"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating account...
+                </>
+              ) : (
+                'Create Account'
+              )}
+            </Button>
+
+            <div className="text-center text-gray-300">
+              Already have an account?{' '}
+              <Link href="/login" className="text-red-400 hover:text-red-300 font-medium">
+                Sign in
+              </Link>
+            </div>
         </form>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   )
 } 

@@ -362,4 +362,452 @@ class AudioFileController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get lite mastering presets
+     */
+    public function getLiteMasteringPresets(): JsonResponse
+    {
+        // Convert to frontend-expected format
+        $frontendPresets = [
+            'presets' => [
+                [
+                    'value' => 'rock',
+                    'label' => 'Rock',
+                    'description' => 'High energy, punchy sound with enhanced bass and presence',
+                    'target_loudness' => -10,
+                    'compression_ratio' => 4,
+                    'stereo_width' => 15,
+                    'bass_boost' => 2,
+                    'presence_boost' => 2,
+                    'dynamic_range' => 'compressed',
+                    'high_freq_enhancement' => true,
+                    'low_freq_enhancement' => true,
+                    'noise_reduction' => false,
+                ],
+                [
+                    'value' => 'pop',
+                    'label' => 'Pop',
+                    'description' => 'Bright, commercial sound with enhanced clarity',
+                    'target_loudness' => -8,
+                    'compression_ratio' => 6,
+                    'stereo_width' => 20,
+                    'bass_boost' => 1.5,
+                    'presence_boost' => 2.5,
+                    'dynamic_range' => 'compressed',
+                    'high_freq_enhancement' => true,
+                    'low_freq_enhancement' => false,
+                    'noise_reduction' => false,
+                ],
+                [
+                    'value' => 'electronic',
+                    'label' => 'Electronic',
+                    'description' => 'Deep bass, crisp highs, and enhanced stereo width',
+                    'target_loudness' => -6,
+                    'compression_ratio' => 8,
+                    'stereo_width' => 25,
+                    'bass_boost' => 3,
+                    'presence_boost' => 1.5,
+                    'dynamic_range' => 'compressed',
+                    'high_freq_enhancement' => true,
+                    'low_freq_enhancement' => true,
+                    'noise_reduction' => false,
+                ],
+                [
+                    'value' => 'jazz',
+                    'label' => 'Jazz',
+                    'description' => 'Warm, natural sound with enhanced midrange',
+                    'target_loudness' => -12,
+                    'compression_ratio' => 2,
+                    'stereo_width' => 10,
+                    'bass_boost' => 1,
+                    'presence_boost' => 1.5,
+                    'dynamic_range' => 'natural',
+                    'high_freq_enhancement' => false,
+                    'low_freq_enhancement' => false,
+                    'noise_reduction' => true,
+                ],
+                [
+                    'value' => 'classical',
+                    'label' => 'Classical',
+                    'description' => 'Natural, transparent sound with subtle enhancement',
+                    'target_loudness' => -14,
+                    'compression_ratio' => 1.5,
+                    'stereo_width' => 5,
+                    'bass_boost' => 0.5,
+                    'presence_boost' => 1,
+                    'dynamic_range' => 'natural',
+                    'high_freq_enhancement' => false,
+                    'low_freq_enhancement' => false,
+                    'noise_reduction' => true,
+                ],
+            ],
+            'quality_options' => [
+                [
+                    'value' => 'fast',
+                    'label' => 'Fast',
+                    'description' => 'Quick processing for immediate results'
+                ],
+                [
+                    'value' => 'standard',
+                    'label' => 'Standard',
+                    'description' => 'Balanced quality and speed'
+                ],
+                [
+                    'value' => 'high',
+                    'label' => 'High',
+                    'description' => 'Maximum quality processing'
+                ],
+            ],
+            'dynamic_range_options' => [
+                [
+                    'value' => 'natural',
+                    'label' => 'Natural',
+                    'description' => 'Preserve original dynamics'
+                ],
+                [
+                    'value' => 'balanced',
+                    'label' => 'Balanced',
+                    'description' => 'Moderate compression'
+                ],
+                [
+                    'value' => 'compressed',
+                    'label' => 'Compressed',
+                    'description' => 'High compression for loudness'
+                ],
+            ],
+        ];
+
+        return response()->json($frontendPresets);
+    }
+
+    /**
+     * Get processing status of an audio file
+     */
+    public function getStatus(AudioFile $audioFile): JsonResponse
+    {
+        $this->authorize('view', $audioFile);
+
+        return response()->json([
+            'id' => $audioFile->id,
+            'status' => $audioFile->status,
+            'progress' => $audioFile->progress ?? 0,
+            'mastered_path' => $audioFile->mastered_path,
+            'original_filename' => $audioFile->original_filename,
+            'error_message' => $audioFile->error_message,
+            'created_at' => $audioFile->created_at,
+            'updated_at' => $audioFile->updated_at,
+        ]);
+    }
+
+    /**
+     * Download processed audio file
+     */
+    public function download(AudioFile $audioFile, Request $request): JsonResponse
+    {
+        $this->authorize('view', $audioFile);
+
+        try {
+            $format = $request->input('format', 'wav');
+            
+            // Determine which file to download
+            $filePath = null;
+            $fileName = null;
+            
+            if ($audioFile->mastered_path && Storage::disk('public')->exists($audioFile->mastered_path)) {
+                $filePath = $audioFile->mastered_path;
+                $fileName = 'mastered_' . $audioFile->original_filename;
+            } elseif ($audioFile->original_path && Storage::disk('public')->exists($audioFile->original_path)) {
+                $filePath = $audioFile->original_path;
+                $fileName = $audioFile->original_filename;
+            } else {
+                return response()->json([
+                    'message' => 'No audio file found for download',
+                ], 404);
+            }
+
+            $fullPath = Storage::disk('public')->path($filePath);
+            
+            if (!file_exists($fullPath)) {
+                return response()->json([
+                    'message' => 'Audio file not found on disk',
+                ], 404);
+            }
+
+            // Get file contents
+            $fileContents = file_get_contents($fullPath);
+            
+            if ($fileContents === false) {
+                return response()->json([
+                    'message' => 'Failed to read audio file',
+                ], 500);
+            }
+
+            // Determine MIME type
+            $mimeType = Storage::disk('public')->mimeType($filePath) ?? 'audio/wav';
+
+            return response()->json([
+                'file' => base64_encode($fileContents),
+                'filename' => $fileName,
+                'mime_type' => $mimeType,
+                'size' => strlen($fileContents),
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to download audio file:', [
+                'error' => $e->getMessage(),
+                'audio_file' => $audioFile,
+                'user' => auth()->user(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to download audio file',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Apply lite automatic mastering to an audio file
+     */
+    public function applyLiteAutomaticMastering(Request $request, AudioFile $audioFile): JsonResponse
+    {
+        $this->authorize('update', $audioFile);
+
+        try {
+            $validator = Validator::make($request->all(), [
+                'genre_preset' => 'required|string|in:rock,pop,electronic,jazz,classical',
+                'target_loudness' => 'required|numeric|min:-20|max:-5',
+                'bass_boost' => 'required|numeric|min:0|max:5',
+                'presence_boost' => 'required|numeric|min:0|max:5',
+            ]);
+
+            if ($validator->fails()) {
+                throw new ValidationException($validator);
+            }
+
+            // Get the genre preset settings
+            $presets = [
+                'rock' => [
+                    'bass' => 2.0,
+                    'low_mid' => 1.5,
+                    'mid' => 0.5,
+                    'high_mid' => 2.0,
+                    'treble' => 1.0
+                ],
+                'pop' => [
+                    'bass' => 1.5,
+                    'low_mid' => 0.5,
+                    'mid' => 1.0,
+                    'high_mid' => 2.5,
+                    'treble' => 2.0
+                ],
+                'electronic' => [
+                    'bass' => 3.0,
+                    'low_mid' => 1.0,
+                    'mid' => 0.0,
+                    'high_mid' => 1.5,
+                    'treble' => 2.5
+                ],
+                'jazz' => [
+                    'bass' => 1.0,
+                    'low_mid' => 2.0,
+                    'mid' => 2.5,
+                    'high_mid' => 1.5,
+                    'treble' => 0.5
+                ],
+                'classical' => [
+                    'bass' => 0.5,
+                    'low_mid' => 1.0,
+                    'mid' => 1.5,
+                    'high_mid' => 1.0,
+                    'treble' => 1.5
+                ]
+            ];
+
+            $genrePreset = $request->input('genre_preset');
+            $eqSettings = $presets[$genrePreset];
+            
+            // Apply bass and presence boosts
+            $eqSettings['bass'] += $request->input('bass_boost', 0);
+            $eqSettings['high_mid'] += $request->input('presence_boost', 0);
+            
+            // Get the input file path
+            $inputPath = $audioFile->original_path;
+            if (!$inputPath || !Storage::disk('public')->exists($inputPath)) {
+                throw new \Exception('No original audio file found for processing');
+            }
+
+            $fullInputPath = Storage::disk('public')->path($inputPath);
+            
+            // Try AI mastering first
+            $aiMasteringUsed = false;
+            $outputPath = null;
+            
+            try {
+                // Check if aimastering tool is available
+                $aimasteringPath = base_path('aimastering-windows-amd64.exe');
+                if (file_exists($aimasteringPath)) {
+                    $outputPath = $this->applyAIMastering($fullInputPath, $request->input('target_loudness'));
+                    $aiMasteringUsed = true;
+                } else {
+                    Log::info('Aimastering tool not available, using fallback processing', ['audio_file_id' => $audioFile->id]);
+                }
+            } catch (\Exception $e) {
+                Log::warning('AI mastering failed, using fallback processing', [
+                    'error' => $e->getMessage(),
+                    'audio_file_id' => $audioFile->id
+                ]);
+            }
+            
+            // If AI mastering failed or not available, use local processing
+            if (!$outputPath) {
+                $outputPath = $this->applyLocalMastering($fullInputPath, $request->input('target_loudness'));
+            }
+            
+            // Apply EQ enhancement
+            $eqProcessor = new EQProcessor();
+            $finalOutputPath = $eqProcessor->enhanceAIMaster($outputPath, [
+                [
+                    'frequency' => 80,
+                    'gain' => $eqSettings['bass']
+                ],
+                [
+                    'frequency' => 200,
+                    'gain' => $eqSettings['low_mid']
+                ],
+                [
+                    'frequency' => 1000,
+                    'gain' => $eqSettings['mid']
+                ],
+                [
+                    'frequency' => 5000,
+                    'gain' => $eqSettings['high_mid']
+                ],
+                [
+                    'frequency' => 10000,
+                    'gain' => $eqSettings['treble']
+                ]
+            ]);
+            
+            // Store the processed file
+            $relativeOutputPath = 'audio/mastered/' . basename($finalOutputPath);
+            Storage::disk('public')->put($relativeOutputPath, file_get_contents($finalOutputPath));
+            
+            // Update the audio file record
+            $audioFile->update([
+                'mastered_path' => $relativeOutputPath,
+                'status' => 'completed',
+                'eq_applied' => true,
+                'eq_settings' => $eqSettings,
+                'metadata' => array_merge($audioFile->metadata ?? [], [
+                    'lite_mastering_applied' => true,
+                    'genre_preset' => $genrePreset,
+                    'target_loudness' => $request->input('target_loudness'),
+                    'bass_boost' => $request->input('bass_boost'),
+                    'presence_boost' => $request->input('presence_boost'),
+                    'ai_mastering_used' => $aiMasteringUsed,
+                ])
+            ]);
+
+            // Clean up temporary files
+            $eqProcessor->cleanupTempFiles();
+            if (file_exists($outputPath) && $outputPath !== $fullInputPath) {
+                unlink($outputPath);
+            }
+            if (file_exists($finalOutputPath) && $finalOutputPath !== $outputPath) {
+                unlink($finalOutputPath);
+            }
+
+            return response()->json([
+                'message' => 'Lite automatic mastering completed successfully',
+                'audio_file' => $audioFile->fresh(),
+                'genre_preset' => $genrePreset,
+                'ai_mastering_used' => $aiMasteringUsed,
+            ]);
+
+        } catch (ValidationException $e) {
+            Log::warning('Lite automatic mastering validation failed:', [
+                'errors' => $e->errors(),
+                'audio_file' => $audioFile,
+                'user' => auth()->user(),
+            ]);
+            return response()->json(['errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            Log::error('Failed to apply lite automatic mastering:', [
+                'error' => $e->getMessage(),
+                'audio_file' => $audioFile,
+                'user' => auth()->user(),
+            ]);
+            
+            // Update status to failed
+            $audioFile->update([
+                'status' => 'failed',
+                'error_message' => $e->getMessage()
+            ]);
+            
+            return response()->json([
+                'message' => 'Lite automatic mastering failed',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Apply AI mastering using the aimastering tool
+     */
+    private function applyAIMastering(string $inputPath, float $targetLoudness): string
+    {
+        $outputPath = tempnam(sys_get_temp_dir(), 'ai_mastered_') . '.wav';
+        $aimasteringPath = base_path('aimastering-windows-amd64.exe');
+        
+        $command = sprintf(
+            '"%s" -i "%s" -o "%s" -l %f',
+            $aimasteringPath,
+            $inputPath,
+            $outputPath,
+            $targetLoudness
+        );
+        
+        $output = [];
+        $returnCode = 0;
+        
+        exec($command, $output, $returnCode);
+        
+        if ($returnCode !== 0 || !file_exists($outputPath)) {
+            throw new \Exception('AI mastering failed: ' . implode("\n", $output));
+        }
+        
+        return $outputPath;
+    }
+
+    /**
+     * Apply local mastering using SoX
+     */
+    private function applyLocalMastering(string $inputPath, float $targetLoudness): string
+    {
+        $outputPath = tempnam(sys_get_temp_dir(), 'local_mastered_') . '.wav';
+        
+        // Calculate gain adjustment based on target loudness
+        // This is a simplified approach - in production you'd use proper loudness measurement
+        $gainAdjustment = $targetLoudness + 14; // Rough approximation
+        
+        $command = sprintf(
+            'sox "%s" "%s" gain %f',
+            $inputPath,
+            $outputPath,
+            $gainAdjustment
+        );
+        
+        $output = [];
+        $returnCode = 0;
+        
+        exec($command, $output, $returnCode);
+        
+        if ($returnCode !== 0 || !file_exists($outputPath)) {
+            throw new \Exception('Local mastering failed: ' . implode("\n", $output));
+        }
+        
+        return $outputPath;
+    }
 } 

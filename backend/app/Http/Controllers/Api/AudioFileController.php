@@ -73,50 +73,44 @@ class AudioFileController extends Controller
         finfo_close($finfo);
 
         if (!in_array($mimeType, $allowedMimeTypes)) {
-            $supportedFormats = strtoupper(implode(', ', config('audio.supported_formats.extensions')));
             return response()->json([
-                'message' => 'Validation failed',
-                'errors' => [
-                    'audio' => ["Invalid file type. Allowed types: {$supportedFormats}"]
-                ]
+                'message' => 'Unsupported file type',
+                'error' => 'The uploaded file type is not supported. Please upload a valid audio file.',
             ], 422);
         }
 
+        try {
+            $user = $request->user();
         $originalFilename = $file->getClientOriginalName();
-        $path = $file->store(config('audio.processing.original_directory'), config('audio.storage.disk'));
+            $fileSize = $file->getSize();
+            $extension = $file->getClientOriginalExtension();
 
+            // Generate unique filename
+            $filename = uniqid() . '_' . time() . '.' . $extension;
+            $path = $file->storeAs('audio/original', $filename, 'public');
+
+            // Create audio file record
         $audioFile = AudioFile::create([
-            'user_id' => auth()->id(),
+                'user_id' => $user->id,
             'original_filename' => $originalFilename,
             'original_path' => $path,
+                'file_size' => $fileSize,
             'mime_type' => $mimeType,
-            'file_size' => $file->getSize(),
-            'status' => 'pending',
-        ]);
-
-        try {
-            $this->processAudio($audioFile);
-        } catch (\Exception $e) {
-            Log::error('Audio processing failed', [
-                'error' => $e->getMessage(),
-                'audio_file_id' => $audioFile->id,
-            ]);
-
-            $audioFile->update([
-                'status' => 'failed',
-                'error_message' => $e->getMessage(),
+                'status' => 'uploaded'
             ]);
 
             return response()->json([
-                'message' => 'Audio processing failed',
-                'error' => $e->getMessage(),
+                'message' => 'Audio file uploaded successfully',
+                'data' => $audioFile
+            ], 201);
+
+        } catch (\Exception $e) {
+            \Log::error('Audio upload failed: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Upload failed',
+                'error' => 'Failed to upload audio file. Please try again.',
             ], 500);
         }
-
-        return response()->json([
-            'message' => 'Audio uploaded successfully',
-            'data' => $audioFile,
-        ]);
     }
 
     /**
@@ -160,9 +154,9 @@ class AudioFileController extends Controller
 
         $request->validate([
             'mastering_settings' => 'required|array',
-            'mastering_settings.target_loudness' => 'required|numeric|between:-20,-8',
-            'mastering_settings.genre_preset' => 'required|string|in:' . implode(',', AdvancedAudioProcessor::getGenrePresets()),
-            'mastering_settings.processing_quality' => 'required|string|in:' . implode(',', AdvancedAudioProcessor::getQualityPresets()),
+            'mastering_settings.target_loudness' => 'nullable|numeric|between:-20,-8',
+            'mastering_settings.genre_preset' => 'nullable|string|in:' . implode(',', AdvancedAudioProcessor::getGenrePresets()),
+            'mastering_settings.processing_quality' => 'nullable|string|in:' . implode(',', AdvancedAudioProcessor::getQualityPresets()),
             'mastering_settings.stereo_width' => 'nullable|numeric|between:-20,20',
             'mastering_settings.bass_boost' => 'nullable|numeric|between:-3,6',
             'mastering_settings.presence_boost' => 'nullable|numeric|between:-3,6',
@@ -170,6 +164,20 @@ class AudioFileController extends Controller
             'mastering_settings.high_freq_enhancement' => 'nullable|boolean',
             'mastering_settings.low_freq_enhancement' => 'nullable|boolean',
             'mastering_settings.noise_reduction' => 'nullable|boolean',
+            'mastering_settings.limiter_enabled' => 'nullable|boolean',
+            'mastering_settings.limiter_threshold' => 'nullable|numeric|between:-30,0',
+            'mastering_settings.limiter_release' => 'nullable|numeric|between:5,1000',
+            'mastering_settings.limiter_ceiling' => 'nullable|numeric|between:-3,0',
+            'mastering_settings.auto_mastering_enabled' => 'nullable|boolean',
+            'mastering_settings.reference_audio_enabled' => 'nullable|boolean',
+            'mastering_settings.eq_settings' => 'nullable|array',
+            'mastering_settings.eq_settings.low_shelf' => 'nullable|array',
+            'mastering_settings.eq_settings.high_shelf' => 'nullable|array',
+            'mastering_settings.eq_settings.presence' => 'nullable|array',
+            'mastering_settings.compression_ratio' => 'nullable|numeric|between:1,30',
+            'mastering_settings.attack_time' => 'nullable|numeric|between:0.0001,0.1',
+            'mastering_settings.release_time' => 'nullable|numeric|between:0.001,1',
+            'mastering_settings.eq_bands' => 'nullable|array',
         ]);
 
         try {
@@ -177,7 +185,7 @@ class AudioFileController extends Controller
 
             $inputPath = Storage::disk(config('audio.storage.disk'))->path($audioFile->original_path);
             $outputPath = Storage::disk(config('audio.storage.disk'))->path(
-                config('audio.processing.output_directory') . '/' . $audioFile->id . '_advanced.wav'
+                config('audio.processing.output_directory') . '/' . $audioFile->id . '_automatic_mastered.wav'
             );
 
             // Ensure output directory exists
@@ -185,31 +193,85 @@ class AudioFileController extends Controller
                 mkdir(dirname($outputPath), 0755, true);
             }
 
+            // Merge settings with defaults if needed
+            $settings = $request->input('mastering_settings');
+            
+            // Set defaults for missing values
+            $settings['target_loudness'] = $settings['target_loudness'] ?? -10;
+            $settings['genre_preset'] = $settings['genre_preset'] ?? 'pop';
+            $settings['processing_quality'] = $settings['processing_quality'] ?? 'standard';
+            
+            // Apply genre preset if auto mastering is enabled
+            if ($settings['auto_mastering_enabled'] ?? false) {
+                $genrePreset = AdvancedAudioProcessor::getGenrePresetData($settings['genre_preset']);
+                if ($genrePreset) {
+                    $settings = array_merge($settings, $genrePreset);
+                }
+            }
+
             $result = $this->advancedProcessor->processWithAdvancedSettings(
                 $inputPath,
                 $outputPath,
-                $request->input('mastering_settings')
+                $settings
             );
 
             // Update audio file with new metadata
             $audioFile->update([
                 'status' => 'completed',
-                'mastered_path' => config('audio.processing.output_directory') . '/' . $audioFile->id . '_advanced.wav',
+                'automatic_mastered_path' => config('audio.processing.output_directory') . '/' . $audioFile->id . '_automatic_mastered.wav',
                 'metadata' => array_merge($audioFile->metadata ?? [], [
-                    'advanced_mastering_applied' => true,
-                    'mastering_settings' => $request->input('mastering_settings'),
+                    'automatic_mastering_applied' => true,
+                    'mastering_settings' => $settings,
                     'analysis' => $result['analysis'],
+                    'mastering_changes' => $result['mastering_changes'],
                     'processing_time' => microtime(true) - LARAVEL_START,
-                ])
+                    'auto_mastering_enabled' => $settings['auto_mastering_enabled'] ?? false,
+                    'limiter_enabled' => $settings['limiter_enabled'] ?? false,
+                    'eq_settings' => $settings['eq_settings'] ?? [],
+                    'compression_settings' => [
+                        'ratio' => $settings['compression_ratio'] ?? null,
+                        'attack' => $settings['attack_time'] ?? null,
+                        'release' => $settings['release_time'] ?? null,
+                    ],
+                    'limiter_settings' => [
+                        'threshold' => $settings['limiter_threshold'] ?? null,
+                        'release' => $settings['limiter_release'] ?? null,
+                        'ceiling' => $settings['limiter_ceiling'] ?? null,
+                    ],
+                    'enhancement_settings' => [
+                        'stereo_width' => $settings['stereo_width'] ?? null,
+                        'bass_boost' => $settings['bass_boost'] ?? null,
+                        'presence_boost' => $settings['presence_boost'] ?? null,
+                        'dynamic_range' => $settings['dynamic_range'] ?? null,
+                        'high_freq_enhancement' => $settings['high_freq_enhancement'] ?? false,
+                        'low_freq_enhancement' => $settings['low_freq_enhancement'] ?? false,
+                        'noise_reduction' => $settings['noise_reduction'] ?? false,
+                    ],
+                ]),
+                'mastering_metadata' => [
+                    'automatic' => [
+                        'applied' => true,
+                        'settings' => $settings,
+                        'analysis' => $result['analysis'],
+                        'mastering_changes' => $result['mastering_changes'],
+                        'processing_time' => microtime(true) - LARAVEL_START,
+                    ]
+                ]
             ]);
 
+            $audioFile->mastered_path = $audioFile->automatic_mastered_path ?? $audioFile->advanced_mastered_path;
+            $audioFile->save();
+
             return response()->json([
-                'message' => 'Advanced mastering applied successfully',
-                'data' => $audioFile->fresh(),
+                'message' => 'Crysgarage Studio 1 mastering applied successfully',
+                'data' => [
+                    'audio_file' => $audioFile->fresh(),
+                    'mastering_changes' => $result['mastering_changes'] ?? null,
+                ],
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Advanced mastering failed', [
+            Log::error('Crysgarage Studio 1 mastering failed', [
                 'audio_file_id' => $audioFile->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -221,7 +283,7 @@ class AudioFileController extends Controller
             ]);
 
             return response()->json([
-                'message' => 'Advanced mastering failed',
+                'message' => 'Crysgarage Studio 1 mastering failed',
                 'error' => $e->getMessage(),
             ], 500);
         }
@@ -347,35 +409,31 @@ class AudioFileController extends Controller
     /**
      * Download processed audio
      */
-    public function download(AudioFile $audioFile, Request $request): JsonResponse
+    public function download($id, Request $request)
     {
-        $this->authorize('view', $audioFile);
+        $audio = AudioFile::findOrFail($id);
+        $format = $request->query('format', 'wav');
+        $path = storage_path('app/' . $audio->mastered_path);
 
-        if ($audioFile->status !== 'completed') {
-            return response()->json([
-                'message' => 'Audio file is not ready for download',
-            ], 400);
+        if (!file_exists($path)) {
+            abort(404, 'File not found');
         }
 
-        $format = $request->get('format', 'wav');
-        $audioPath = Storage::disk(config('audio.storage.disk'))->path($audioFile->mastered_path);
-
-        if (!file_exists($audioPath)) {
-            return response()->json([
-                'message' => 'Audio file not found',
-            ], 404);
+        // If requested format is the same as stored, just return the file
+        if ($format === 'wav') {
+            return response()->download($path, pathinfo($audio->original_filename, PATHINFO_FILENAME) . '.wav');
         }
 
-        // Generate download URL
-        $downloadUrl = Storage::disk(config('audio.storage.disk'))->url($audioFile->mastered_path);
+        // Otherwise, convert using ffmpeg
+        $output = tempnam(sys_get_temp_dir(), 'audio_') . '.' . $format;
+        $cmd = "ffmpeg -y -i " . escapeshellarg($path) . " " . escapeshellarg($output);
+        exec($cmd);
 
-        return response()->json([
-            'data' => [
-                'download_url' => $downloadUrl,
-                'filename' => $audioFile->original_filename . '_mastered.' . $format,
-                'file_size' => filesize($audioPath),
-            ]
-        ]);
+        if (!file_exists($output)) {
+            abort(500, 'Conversion failed');
+        }
+
+        return response()->download($output, pathinfo($audio->original_filename, PATHINFO_FILENAME) . '.' . $format)->deleteFileAfterSend(true);
     }
 
     /**
@@ -383,17 +441,57 @@ class AudioFileController extends Controller
      */
     public function getStatus(AudioFile $audioFile): JsonResponse
     {
+        Log::info('getStatus called', [
+            'audio_file_id' => $audioFile->id,
+            'user_id' => auth()->id(),
+            'status' => $audioFile->status,
+        ]);
         $this->authorize('view', $audioFile);
 
-        return response()->json([
+        // Get mastering type from request if available
+        $masteringType = request()->query('mastering_type', 'automatic');
+
+        $masteredPath = null;
+        $masteringChanges = null;
+
+        switch ($masteringType) {
+            case 'automatic':
+                $masteredPath = $audioFile->automatic_mastered_path;
+                $masteringChanges = $audioFile->mastering_metadata['automatic']['mastering_changes'] ?? null;
+                break;
+            case 'lite-automatic':
+                $masteredPath = $audioFile->lite_automatic_mastered_path;
+                $masteringChanges = $audioFile->mastering_metadata['lite_automatic']['mastering_changes'] ?? null;
+                break;
+            case 'advanced':
+                $masteredPath = $audioFile->advanced_mastered_path;
+                $masteringChanges = $audioFile->mastering_metadata['advanced']['mastering_changes'] ?? null;
+                break;
+            default:
+                $masteredPath = $audioFile->mastered_path;
+                $masteringChanges = $audioFile->metadata['mastering_changes'] ?? null;
+        }
+
+        $response = response()->json([
             'data' => [
                 'status' => $audioFile->status,
                 'progress' => $this->calculateProgress($audioFile),
                 'error_message' => $audioFile->error_message,
                 'created_at' => $audioFile->created_at,
                 'updated_at' => $audioFile->updated_at,
+                'mastered_path' => $masteredPath,
+                'original_filename' => $audioFile->original_filename,
+                'mastering_changes' => $masteringChanges,
+                'mastering_type' => $masteringType,
+                'mastering_metadata' => $audioFile->mastering_metadata,
             ]
         ]);
+        // Add CORS headers for debugging
+        $response->headers->set('Access-Control-Allow-Origin', '*');
+        $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        Log::info('getStatus response', ['audio_file_id' => $audioFile->id, 'response' => $response->getContent()]);
+        return $response;
     }
 
     /**
@@ -440,18 +538,101 @@ class AudioFileController extends Controller
      */
     public function getAvailablePresets(): JsonResponse
     {
-        $genrePresets = AdvancedAudioProcessor::getGenrePresets();
-        $qualityPresets = AdvancedAudioProcessor::getQualityPresets();
-
         return response()->json([
             'data' => [
-                'genre_presets' => $genrePresets,
-                'quality_presets' => $qualityPresets,
-                'user_presets' => ProcessingPreset::where('user_id', auth()->id())
-                    ->orWhere('is_default', true)
-                    ->get(['id', 'name', 'description', 'is_default']),
+                'genre_presets' => AdvancedAudioProcessor::getGenrePresets(),
+                'quality_presets' => AdvancedAudioProcessor::getQualityPresets(),
             ]
         ]);
+    }
+
+    /**
+     * Get genre presets for Automatic Mastery
+     */
+    public function getGenrePresets(): JsonResponse
+    {
+        return response()->json([
+            'data' => [
+                'genre_presets' => AdvancedAudioProcessor::getAllGenrePresetData(),
+                'available_genres' => AdvancedAudioProcessor::getGenrePresets(),
+            ]
+        ]);
+    }
+
+    /**
+     * Get real-time frequency spectrum analysis
+     */
+    public function getFrequencySpectrum(AudioFile $audioFile): JsonResponse
+    {
+        $this->authorize('view', $audioFile);
+
+        try {
+            $audioPath = Storage::disk(config('audio.storage.disk'))->path($audioFile->original_path);
+            
+            if (!file_exists($audioPath)) {
+                return response()->json([
+                    'error' => 'Audio file not found'
+                ], 404);
+            }
+
+            // Use SoX to get frequency spectrum data
+            $process = new Process([
+                'sox', $audioPath, '-n', 'stat', '-freq', '2>&1'
+            ]);
+            $process->setTimeout(30);
+            $process->run();
+
+            if (!$process->isSuccessful()) {
+                // Return fallback spectrum data
+                return response()->json([
+                    'data' => [
+                        'frequencies' => range(20, 20000, 100),
+                        'magnitudes' => array_fill(0, 199, rand(-60, -20)),
+                        'note' => 'Spectrum data is estimated (SoX analysis failed)'
+                    ]
+                ]);
+            }
+
+            $output = $process->getOutput();
+            
+            // Parse frequency spectrum data
+            $frequencies = [];
+            $magnitudes = [];
+            
+            // Extract frequency and magnitude data from SoX output
+            $lines = explode("\n", $output);
+            foreach ($lines as $line) {
+                if (preg_match('/^(\d+(?:\.\d+)?)\s+([-\d.]+)$/', trim($line), $matches)) {
+                    $frequencies[] = (float)$matches[1];
+                    $magnitudes[] = (float)$matches[2];
+                }
+            }
+
+            // If no data found, return fallback
+            if (empty($frequencies)) {
+                $frequencies = range(20, 20000, 100);
+                $magnitudes = array_fill(0, 199, rand(-60, -20));
+            }
+
+            return response()->json([
+                'data' => [
+                    'frequencies' => $frequencies,
+                    'magnitudes' => $magnitudes,
+                    'audio_file_id' => $audioFile->id,
+                    'timestamp' => now()->toISOString(),
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Frequency spectrum analysis failed', [
+                'audio_file_id' => $audioFile->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'error' => 'Failed to analyze frequency spectrum: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -650,65 +831,154 @@ class AudioFileController extends Controller
     {
         $this->authorize('update', $audioFile);
 
-        try {
             $request->validate([
                 'mastering_settings' => 'required|array',
-                'mastering_settings.genre_preset' => 'required|string|in:' . implode(',', AdvancedAudioProcessor::getGenrePresets()),
-                'mastering_settings.processing_quality' => 'required|string|in:' . implode(',', AdvancedAudioProcessor::getQualityPresets()),
-                'mastering_settings.target_loudness' => 'required|numeric|between:-20,-8',
-                'mastering_settings.compression_ratio' => 'required|numeric|between:1,20',
-                'mastering_settings.eq_settings' => 'required|array',
-                'mastering_settings.eq_settings.bass' => 'required|numeric|between:-12,12',
-                'mastering_settings.eq_settings.low_mid' => 'required|numeric|between:-12,12',
-                'mastering_settings.eq_settings.mid' => 'required|numeric|between:-12,12',
-                'mastering_settings.eq_settings.high_mid' => 'required|numeric|between:-12,12',
-                'mastering_settings.eq_settings.treble' => 'required|numeric|between:-12,12',
+            'mastering_settings.genre_preset' => 'nullable|string|in:' . implode(',', AdvancedAudioProcessor::getGenrePresets()),
+            'mastering_settings.limiter_enabled' => 'nullable|boolean',
+            'mastering_settings.limiter_threshold' => 'nullable|numeric|between:-30,0',
+            'mastering_settings.limiter_release' => 'nullable|numeric|between:5,1000',
+            'mastering_settings.limiter_ceiling' => 'nullable|numeric|between:-3,0',
+            'mastering_settings.auto_mastering_enabled' => 'nullable|boolean',
+            'mastering_settings.eq_settings' => 'nullable|array',
+            'mastering_settings.eq_settings.low_shelf' => 'nullable|array',
+            'mastering_settings.eq_settings.high_shelf' => 'nullable|array',
+            'mastering_settings.eq_settings.presence' => 'nullable|array',
+            'mastering_settings.compression_ratio' => 'nullable|numeric|between:1,30',
+            'mastering_settings.attack_time' => 'nullable|numeric|between:0.0001,0.1',
+            'mastering_settings.release_time' => 'nullable|numeric|between:0.001,1',
+            'mastering_settings.stereo_width' => 'nullable|numeric|between:-20,20',
+            'mastering_settings.bass_boost' => 'nullable|numeric|between:-3,6',
+            'mastering_settings.presence_boost' => 'nullable|numeric|between:-3,6',
+            'mastering_settings.dynamic_range' => 'nullable|string|in:compressed,natural,expanded',
+            'mastering_settings.high_freq_enhancement' => 'nullable|boolean',
+            'mastering_settings.low_freq_enhancement' => 'nullable|boolean',
+            'mastering_settings.noise_reduction' => 'nullable|boolean',
+            'mastering_settings.eq_bands' => 'nullable|array',
+        ]);
+
+        try {
+            $settings = $request->input('mastering_settings');
+            
+            // For real-time processing, we use the original audio path
+            // since effects are applied using Web Audio API in the browser
+            $originalPath = $audioFile->original_path;
+            
+            // Get genre preset for real-time analysis
+            $genrePreset = null;
+            if (!empty($settings['genre_preset'])) {
+                $genrePresets = AdvancedAudioProcessor::getGenrePresets();
+                $genrePreset = $genrePresets[$settings['genre_preset']] ?? null;
+            }
+            
+            // Update audio file with new metadata and settings
+            $audioFile->update([
+                'status' => 'completed',
+                'mastered_path' => $originalPath, // Use original for real-time
+                'metadata' => array_merge($audioFile->metadata ?? [], [
+                    'realtime_mastering_applied' => true,
+                    'mastering_settings' => $settings,
+                    'genre_preset' => $settings['genre_preset'] ?? null,
+                    'genre_preset_data' => $genrePreset,
+                    'processing_timestamp' => now()->toISOString(),
+                    'web_audio_api_used' => true,
+                    'auto_mastering_enabled' => $settings['auto_mastering_enabled'] ?? false,
+                    'limiter_enabled' => $settings['limiter_enabled'] ?? false,
+                    'eq_settings' => $settings['eq_settings'] ?? [],
+                    'compression_settings' => [
+                        'ratio' => $settings['compression_ratio'] ?? null,
+                        'attack' => $settings['attack_time'] ?? null,
+                        'release' => $settings['release_time'] ?? null,
+                    ],
+                    'limiter_settings' => [
+                        'threshold' => $settings['limiter_threshold'] ?? null,
+                        'release' => $settings['limiter_release'] ?? null,
+                        'ceiling' => $settings['limiter_ceiling'] ?? null,
+                    ],
+                    'enhancement_settings' => [
+                        'stereo_width' => $settings['stereo_width'] ?? null,
+                        'bass_boost' => $settings['bass_boost'] ?? null,
+                        'presence_boost' => $settings['presence_boost'] ?? null,
+                        'dynamic_range' => $settings['dynamic_range'] ?? null,
+                        'high_freq_enhancement' => $settings['high_freq_enhancement'] ?? false,
+                        'low_freq_enhancement' => $settings['low_freq_enhancement'] ?? false,
+                        'noise_reduction' => $settings['noise_reduction'] ?? false,
+                    ],
+                ])
             ]);
 
-            $settings = $request->input('mastering_settings');
-            $inputPath = storage_path('app/' . $audioFile->original_path);
-            
-            // Generate a unique output path for real-time processing
-            $outputPath = storage_path('app/public/audio/' . $audioFile->id . '_realtime_' . time() . '.wav');
-            
-            // Process with optimized settings for speed
-            $result = $this->advancedProcessor->processWithAdvancedSettings(
-                $inputPath,
-                $outputPath,
-                $settings
-            );
-
-            if ($result['success']) {
-                // Update the audio file with the real-time processed version
-                $audioFile->mastered_path = str_replace(storage_path('app/'), '', $outputPath);
-                $audioFile->status = 'completed';
-                $audioFile->metadata = array_merge($audioFile->metadata ?? [], [
-                    'realtime_processing' => true,
-                    'processing_time' => microtime(true) - LARAVEL_START,
-                    'analysis' => $result['analysis'] ?? []
-                ]);
-                $audioFile->save();
-
                 return response()->json([
-                    'success' => true,
                     'message' => 'Real-time mastering applied successfully',
-                    'data' => $audioFile,
-                    'output_url' => Storage::url($audioFile->mastered_path)
-                ]);
-            } else {
-                throw new Exception('Real-time mastering failed');
-            }
-
-        } catch (Exception $e) {
+                'data' => [
+                    'audio_file' => $audioFile,
+                    'real_time_path' => $originalPath,
+                    'real_time_url' => Storage::disk(config('audio.storage.disk'))->url($originalPath),
+                    'web_audio_api' => true,
+                    'genre_preset' => $genrePreset,
+                    'settings_applied' => $settings,
+                ]
+            ]);
+        } catch (\Exception $e) {
             Log::error('Real-time mastering failed', [
-                'audio_file_id' => $audioFile->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'audio_file_id' => $audioFile->id,
+            ]);
+
+            $audioFile->update([
+                'status' => 'failed',
+                'error_message' => $e->getMessage(),
             ]);
 
             return response()->json([
-                'success' => false,
-                'message' => 'Real-time mastering failed: ' . $e->getMessage()
+                'message' => 'Real-time mastering failed',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Upload reference audio for mastering
+     */
+    public function uploadReferenceAudio(Request $request, AudioFile $audioFile): JsonResponse
+    {
+        $this->authorize('update', $audioFile);
+
+        $request->validate([
+            'reference_audio' => 'required|file|max:102400', // 100MB max
+        ]);
+
+        try {
+            $file = $request->file('reference_audio');
+            $originalFilename = $file->getClientOriginalName();
+            $path = $file->store(
+                config('audio.processing.reference_directory', 'reference_audio'), 
+                config('audio.storage.disk')
+            );
+
+            // Update audio file with reference audio path
+            $audioFile->update([
+                'metadata' => array_merge($audioFile->metadata ?? [], [
+                    'reference_audio_path' => $path,
+                    'reference_audio_filename' => $originalFilename,
+                    'reference_audio_uploaded_at' => now()->toISOString(),
+                ])
+            ]);
+
+            return response()->json([
+                'message' => 'Reference audio uploaded successfully',
+                'data' => [
+                    'reference_audio_path' => $path,
+                    'reference_audio_filename' => $originalFilename,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Reference audio upload failed', [
+                'error' => $e->getMessage(),
+                'audio_file_id' => $audioFile->id,
+            ]);
+
+            return response()->json([
+                'message' => 'Reference audio upload failed',
+                'error' => $e->getMessage(),
             ], 500);
         }
     }

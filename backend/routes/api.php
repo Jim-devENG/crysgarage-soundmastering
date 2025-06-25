@@ -28,6 +28,28 @@ Route::get('/test-storage/{path}', function ($path) {
     ]);
 })->where('path', '.*');
 
+// Test download route
+Route::get('/test-download/{path}', function ($path) {
+    $fullPath = storage_path('app/public/' . $path);
+    
+    if (!file_exists($fullPath)) {
+        return response()->json(['error' => 'File not found'], 404);
+    }
+    
+    $filename = basename($path);
+    $mimeType = mime_content_type($fullPath);
+    
+    return response()->file($fullPath, [
+        'Content-Type' => $mimeType,
+        'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        'Content-Length' => filesize($fullPath),
+        'Access-Control-Allow-Origin' => 'http://localhost:3000',
+        'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+        'Access-Control-Allow-Headers' => 'Content-Type, Authorization, X-Requested-With',
+        'Access-Control-Allow-Credentials' => 'true',
+    ]);
+})->where('path', '.*');
+
 // Storage file serving route with CORS
 Route::get('/storage/{path}', function ($path) {
     $fullPath = storage_path('app/public/' . $path);
@@ -147,6 +169,9 @@ Route::middleware('auth:sanctum')->group(function () {
         // Real-time mastering (for immediate processing)
         Route::post('/{audioFile}/realtime-mastering', [ApiAudioFileController::class, 'applyRealTimeMastering']);
         
+        // Reference audio upload
+        Route::post('/{audioFile}/reference-audio', [ApiAudioFileController::class, 'uploadReferenceAudio']);
+        
         // EQ processing
         Route::post('/{audioFile}/eq', [ApiAudioFileController::class, 'applyEQ']);
         
@@ -167,6 +192,12 @@ Route::middleware('auth:sanctum')->group(function () {
         
         // Get available presets
         Route::get('/presets/available', [ApiAudioFileController::class, 'getAvailablePresets']);
+        
+        // Get genre presets for Automatic Mastery
+        Route::get('/presets/genres', [ApiAudioFileController::class, 'getGenrePresets']);
+        
+        // Get frequency spectrum analysis
+        Route::get('/{audioFile}/frequency-spectrum', [ApiAudioFileController::class, 'getFrequencySpectrum']);
     });
     
     // Chunked upload routes (for large files)
@@ -345,4 +376,19 @@ Route::prefix('health')->group(function () {
 Route::prefix('monitoring')->group(function () {
     Route::post('/', [MonitoringController::class, 'store']);
     Route::get('/', [MonitoringController::class, 'getMetrics']);
+});
+
+// Audio processing routes
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::post('/audio/{audioFile}/master', [AudioFileController::class, 'applyMastering']);
+    Route::post('/audio/{audioFile}/advanced-mastering', [AudioFileController::class, 'applyAdvancedMastering']);
+    Route::post('/audio/{audioFile}/lite-automatic-mastering', [AudioFileController::class, 'applyLiteAutomaticMastering']);
+    Route::get('/audio/{audioFile}/status', [AudioFileController::class, 'getStatus']);
+    Route::get('/audio/{audioFile}/download', [AudioFileController::class, 'download']);
+    Route::get('/audio/{audioFile}/download-mastered', [AudioFileController::class, 'downloadMastered']);
+    Route::delete('/audio/{audioFile}', [AudioFileController::class, 'destroy']);
+    
+    // Preset routes
+    Route::get('/processing-presets', [ProcessingPresetController::class, 'index']);
+    Route::get('/lite-mastering-presets', [AudioFileController::class, 'getLiteMasteringPresets']);
 }); 

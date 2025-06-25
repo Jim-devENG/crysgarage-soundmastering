@@ -4,7 +4,13 @@ import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { audioApi } from '@/lib/api'
 
-export default function AudioUploader() {
+interface AudioUploaderProps {
+  wavOnly?: boolean
+  onUploadComplete?: (audioFile: any) => void
+  onError?: (error: string) => void
+}
+
+export default function AudioUploader({ wavOnly = false, onUploadComplete, onError }: AudioUploaderProps) {
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -19,10 +25,25 @@ export default function AudioUploader() {
       setError(null)
       setProgress(0)
 
-      // Upload file
-      const response = await audioApi.uploadAudio(file)
+      // Use different upload method based on wavOnly prop
+      let response
+      if (wavOnly) {
+        // For WAV-only upload, we'll use the regular upload but validate file type
+        if (!file.name.toLowerCase().endsWith('.wav')) {
+          throw new Error('Only WAV files are allowed for lite automatic mastering')
+        }
+        response = await audioApi.uploadAudio(file)
+      } else {
+        response = await audioApi.uploadAudio(file)
+      }
+      
       const audioFileId = response.data?.id || response.id
       setJobId(audioFileId)
+
+      // Call the onUploadComplete callback if provided
+      if (onUploadComplete && response.data) {
+        onUploadComplete(response.data)
+      }
 
       // Poll for status
       const pollInterval = setInterval(async () => {
@@ -37,26 +58,32 @@ export default function AudioUploader() {
             // Handle completion - maybe redirect to results page
           } else if (status.status === 'failed') {
             clearInterval(pollInterval)
-            setError(status.error_message || 'Processing failed')
+            const errorMsg = status.error_message || 'Processing failed'
+            setError(errorMsg)
+            if (onError) onError(errorMsg)
             setUploading(false)
           }
         } catch (err) {
           clearInterval(pollInterval)
-          setError('Error checking status')
+          const errorMsg = 'Error checking status'
+          setError(errorMsg)
+          if (onError) onError(errorMsg)
           setUploading(false)
         }
       }, 2000)
-    } catch (err) {
-      setError('Upload failed')
+    } catch (err: any) {
+      const errorMsg = err.message || 'Upload failed'
+      setError(errorMsg)
+      if (onError) onError(errorMsg)
       setUploading(false)
     }
-  }, [])
+  }, [wavOnly, onUploadComplete, onError])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: {
-      'audio/*': ['.mp3', '.wav', '.ogg', '.m4a']
-    },
+    accept: wavOnly 
+      ? { 'audio/wav': ['.wav'] }
+      : { 'audio/*': ['.mp3', '.wav', '.ogg', '.m4a'] },
     maxFiles: 1
   })
 
@@ -87,8 +114,16 @@ export default function AudioUploader() {
                 : 'Drag and drop your audio file here, or click to select'}
             </p>
             <p className="text-sm text-gray-400">
-              Supports MP3, WAV, OGG, and M4A files
+              {wavOnly 
+                ? 'Only WAV files are supported for lite automatic mastering'
+                : 'Supports MP3, WAV, OGG, and M4A files'
+              }
             </p>
+            {wavOnly && (
+              <p className="text-xs text-yellow-400">
+                💡 Tip: Convert your audio to WAV format for faster processing without conversion
+              </p>
+            )}
           </div>
         )}
       </div>

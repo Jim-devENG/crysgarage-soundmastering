@@ -48,6 +48,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Lite Automatic Mastering Formats
+    |--------------------------------------------------------------------------
+    |
+    | Define the audio formats that lite automatic mastering can accept.
+    | Lite automatic mastering only supports WAV files to eliminate conversion.
+    |
+    */
+
+    'lite_automatic_formats' => [
+        'extensions' => [
+            'wav'
+        ],
+        'mime_types' => [
+            'audio/wav',
+            'audio/wave',
+            'audio/x-wav',
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | File Size Limits
     |--------------------------------------------------------------------------
     |
@@ -165,8 +186,8 @@ return [
         'enabled' => env('EQ_PROCESSING_ENABLED', true),
         'temp_directory' => storage_path('app/temp/eq'),
         'keep_ai_only_version' => env('KEEP_AI_ONLY_VERSION', true),
-        'max_gain_db' => 12,
-        'min_gain_db' => -12,
+        'max_gain_db' => 18,
+        'min_gain_db' => -18,
         'cleanup_temp_files_hours' => 24,
         'bands' => [
             'bass' => [

@@ -17,6 +17,9 @@ class AudioFile extends Model
         'preset_id',
         'original_path',
         'mastered_path',
+        'automatic_mastered_path',
+        'lite_automatic_mastered_path',
+        'advanced_mastered_path',
         'mp3_path',
         'status',
         'error_message',
@@ -25,12 +28,14 @@ class AudioFile extends Model
         'file_size',
         'hash',
         'metadata',
+        'mastering_metadata',
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'metadata' => 'array',
+        'mastering_metadata' => 'array',
         'file_size' => 'integer',
     ];
 

@@ -34,14 +34,14 @@ interface RealTimeMasteringProps {
 const defaultSettings: MasteringSettings = {
   genre_preset: 'pop',
   processing_quality: 'standard',
-  target_loudness: -14,
-  compression_ratio: 4,
+  target_loudness: -10,
+  compression_ratio: 8,
   eq_settings: {
-    bass: 0,
-    low_mid: 0,
-    mid: 0,
-    high_mid: 0,
-    treble: 0
+    bass: 3,
+    low_mid: 1,
+    mid: 1,
+    high_mid: 2,
+    treble: 2
   }
 }
 
@@ -188,7 +188,7 @@ export default function RealTimeMastering({
               value={[settings.compression_ratio]}
               onValueChange={([value]) => updateSettings({ compression_ratio: value })}
               min={1}
-              max={20}
+              max={30}
               step={0.5}
             />
           </div>
@@ -211,8 +211,8 @@ export default function RealTimeMastering({
                         }
                       })
                     }
-                    min={-12}
-                    max={12}
+                    min={-18}
+                    max={18}
                     step={0.5}
                     orientation="vertical"
                     className="h-32"
