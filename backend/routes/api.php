@@ -181,6 +181,9 @@ Route::middleware('auth:sanctum')->group(function () {
         // Audio analysis
         Route::get('/{audioFile}/analysis', [ApiAudioFileController::class, 'getAnalysis']);
         
+        // Test web API analysis
+        Route::get('/{audioFile}/analysis/web-api-test', [ApiAudioFileController::class, 'testWebAPIAnalysis']);
+        
         // Download processed audio
         Route::get('/{audioFile}/download', [ApiAudioFileController::class, 'download']);
         
@@ -391,4 +394,58 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Preset routes
     Route::get('/processing-presets', [ProcessingPresetController::class, 'index']);
     Route::get('/lite-mastering-presets', [AudioFileController::class, 'getLiteMasteringPresets']);
+});
+
+// Real-time analysis routes
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/audio/{audioFile}/analysis/realtime', [ApiAudioFileController::class, 'getRealTimeAnalysis']);
+    Route::get('/audio/{audioFile}/spectrum/realtime', [ApiAudioFileController::class, 'getRealTimeFrequencySpectrum']);
+    Route::get('/audio/{audioFile}/analysis/comprehensive', [ApiAudioFileController::class, 'getComprehensiveRealTimeAnalysis']);
+});
+
+// Test routes
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/audio/{audioFile}/analysis/web-api-test', [ApiAudioFileController::class, 'testWebAPIAnalysis']);
+    
+    // Debug test route
+    Route::get('/audio/test-analysis/{id}', function ($id) {
+        try {
+            $audioFile = \App\Models\AudioFile::find($id);
+            if (!$audioFile) {
+                return response()->json(['error' => 'Audio file not found'], 404);
+            }
+            
+            return response()->json([
+                'success' => true,
+                'audio_file_id' => $audioFile->id,
+                'original_filename' => $audioFile->original_filename,
+                'user_id' => $audioFile->user_id,
+                'auth_user_id' => auth()->id(),
+                'authenticated' => auth()->check(),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    });
+});
+
+// Public test route (no authentication required)
+Route::get('/audio/public-test-analysis/{id}', function ($id) {
+    try {
+        $audioFile = \App\Models\AudioFile::find($id);
+        if (!$audioFile) {
+            return response()->json(['error' => 'Audio file not found'], 404);
+        }
+        
+        return response()->json([
+            'success' => true,
+            'audio_file_id' => $audioFile->id,
+            'original_filename' => $audioFile->original_filename,
+            'user_id' => $audioFile->user_id,
+            'authenticated' => auth()->check(),
+            'message' => 'Route is working, authentication is the issue',
+        ]);
+    } catch (\Exception $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
 }); 

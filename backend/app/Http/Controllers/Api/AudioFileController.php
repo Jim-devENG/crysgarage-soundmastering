@@ -14,17 +14,23 @@ use App\Services\AdvancedAudioProcessor;
 use App\Models\ProcessingPreset;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Exception;
+use App\Services\WebAudioAnalysisService;
+use App\Services\RealTimeWebAudioAnalysisService;
 
 class AudioFileController extends Controller
 {
     use AuthorizesRequests;
     protected EQProcessor $eqProcessor;
     protected AdvancedAudioProcessor $advancedProcessor;
+    private $webAnalysisService;
+    private $realTimeAnalysisService;
 
     public function __construct()
     {
         $this->eqProcessor = new EQProcessor();
         $this->advancedProcessor = new AdvancedAudioProcessor();
+        $this->webAnalysisService = new WebAudioAnalysisService();
+        $this->realTimeAnalysisService = new RealTimeWebAudioAnalysisService();
     }
 
     /**
@@ -380,10 +386,13 @@ class AudioFileController extends Controller
         $analysis = $audioFile->metadata['analysis'] ?? null;
 
         if (!$analysis) {
-            // Perform analysis if not already done
+            // Perform analysis if not already done using web API
             try {
                 $audioPath = Storage::disk(config('audio.storage.disk'))->path($audioFile->mastered_path);
-                $analysis = $this->advancedProcessor->analyzeAudio($audioPath);
+                
+                // Use web API analysis service instead of local SoX
+                $webAnalysisService = new \App\Services\WebAudioAnalysisService();
+                $analysis = $webAnalysisService->analyzeAudio($audioPath);
                 
                 // Update the audio file with analysis
                 $audioFile->update([
@@ -560,7 +569,7 @@ class AudioFileController extends Controller
     }
 
     /**
-     * Get real-time frequency spectrum analysis
+     * Get real-time frequency spectrum analysis using web API
      */
     public function getFrequencySpectrum(AudioFile $audioFile): JsonResponse
     {
@@ -575,56 +584,15 @@ class AudioFileController extends Controller
                 ], 404);
             }
 
-            // Use SoX to get frequency spectrum data
-            $process = new Process([
-                'sox', $audioPath, '-n', 'stat', '-freq', '2>&1'
-            ]);
-            $process->setTimeout(30);
-            $process->run();
-
-            if (!$process->isSuccessful()) {
-                // Return fallback spectrum data
-                return response()->json([
-                    'data' => [
-                        'frequencies' => range(20, 20000, 100),
-                        'magnitudes' => array_fill(0, 199, rand(-60, -20)),
-                        'note' => 'Spectrum data is estimated (SoX analysis failed)'
-                    ]
-                ]);
-            }
-
-            $output = $process->getOutput();
-            
-            // Parse frequency spectrum data
-            $frequencies = [];
-            $magnitudes = [];
-            
-            // Extract frequency and magnitude data from SoX output
-            $lines = explode("\n", $output);
-            foreach ($lines as $line) {
-                if (preg_match('/^(\d+(?:\.\d+)?)\s+([-\d.]+)$/', trim($line), $matches)) {
-                    $frequencies[] = (float)$matches[1];
-                    $magnitudes[] = (float)$matches[2];
-                }
-            }
-
-            // If no data found, return fallback
-            if (empty($frequencies)) {
-                $frequencies = range(20, 20000, 100);
-                $magnitudes = array_fill(0, 199, rand(-60, -20));
-            }
+            // Use web API service for frequency spectrum analysis
+            $spectrumData = $this->webAnalysisService->analyzeFrequencySpectrum($audioPath);
 
             return response()->json([
-                'data' => [
-                    'frequencies' => $frequencies,
-                    'magnitudes' => $magnitudes,
-                    'audio_file_id' => $audioFile->id,
-                    'timestamp' => now()->toISOString(),
-                ]
+                'data' => $spectrumData
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Frequency spectrum analysis failed', [
+            Log::error('Web API frequency spectrum analysis failed', [
                 'audio_file_id' => $audioFile->id,
                 'error' => $e->getMessage()
             ]);
@@ -979,6 +947,197 @@ class AudioFileController extends Controller
             return response()->json([
                 'message' => 'Reference audio upload failed',
                 'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Test web API analysis
+     */
+    public function testWebAPIAnalysis(AudioFile $audioFile): JsonResponse
+    {
+        $this->authorize('view', $audioFile);
+
+        try {
+            $audioPath = Storage::disk(config('audio.storage.disk'))->path($audioFile->original_path);
+            
+            if (!file_exists($audioPath)) {
+                return response()->json([
+                    'error' => 'Audio file not found'
+                ], 404);
+            }
+
+            $analysis = $this->webAnalysisService->analyzeAudio($audioPath);
+            $spectrumData = $this->webAnalysisService->analyzeFrequencySpectrum($audioPath);
+
+            return response()->json([
+                'data' => [
+                    'analysis' => $analysis,
+                    'spectrum' => $spectrumData,
+                    'audio_file_id' => $audioFile->id,
+                    'test_timestamp' => now()->toISOString(),
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Web API analysis test failed', [
+                'audio_file_id' => $audioFile->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'error' => 'Web API analysis test failed: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Real-time audio analysis using multiple web APIs
+     */
+    public function getRealTimeAnalysis(AudioFile $audioFile): JsonResponse
+    {
+        $this->authorize('view', $audioFile);
+
+        try {
+            $audioPath = Storage::disk(config('audio.storage.disk'))->path($audioFile->original_path);
+            
+            if (!file_exists($audioPath)) {
+                return response()->json([
+                    'error' => 'Audio file not found'
+                ], 404);
+            }
+
+            $startTime = microtime(true);
+            $analysis = $this->realTimeAnalysisService->analyzeAudioRealTime($audioPath);
+            $executionTime = microtime(true) - $startTime;
+
+            Log::info('Real-time analysis completed', [
+                'audio_file_id' => $audioFile->id,
+                'execution_time' => round($executionTime, 3),
+                'analysis_quality' => $analysis['analysis_quality'],
+            ]);
+
+            return response()->json([
+                'data' => [
+                    'analysis' => $analysis,
+                    'execution_time_ms' => round($executionTime * 1000, 2),
+                    'audio_file_id' => $audioFile->id,
+                    'analysis_timestamp' => now()->toISOString(),
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Real-time analysis failed', [
+                'audio_file_id' => $audioFile->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'error' => 'Real-time analysis failed: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Real-time frequency spectrum analysis
+     */
+    public function getRealTimeFrequencySpectrum(AudioFile $audioFile): JsonResponse
+    {
+        $this->authorize('view', $audioFile);
+
+        try {
+            $audioPath = Storage::disk(config('audio.storage.disk'))->path($audioFile->original_path);
+            
+            if (!file_exists($audioPath)) {
+                return response()->json([
+                    'error' => 'Audio file not found'
+                ], 404);
+            }
+
+            $startTime = microtime(true);
+            $spectrumData = $this->realTimeAnalysisService->analyzeFrequencySpectrumRealTime($audioPath);
+            $executionTime = microtime(true) - $startTime;
+
+            Log::info('Real-time frequency spectrum analysis completed', [
+                'audio_file_id' => $audioFile->id,
+                'execution_time' => round($executionTime, 3),
+                'analysis_quality' => $spectrumData['analysis_quality'],
+            ]);
+
+            return response()->json([
+                'data' => [
+                    'spectrum' => $spectrumData,
+                    'execution_time_ms' => round($executionTime * 1000, 2),
+                    'audio_file_id' => $audioFile->id,
+                    'analysis_timestamp' => now()->toISOString(),
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Real-time frequency spectrum analysis failed', [
+                'audio_file_id' => $audioFile->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'error' => 'Real-time frequency spectrum analysis failed: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get comprehensive real-time analysis (both audio and spectrum)
+     */
+    public function getComprehensiveRealTimeAnalysis(AudioFile $audioFile): JsonResponse
+    {
+        $this->authorize('view', $audioFile);
+
+        try {
+            $audioPath = Storage::disk(config('audio.storage.disk'))->path($audioFile->original_path);
+            
+            if (!file_exists($audioPath)) {
+                return response()->json([
+                    'error' => 'Audio file not found'
+                ], 404);
+            }
+
+            $startTime = microtime(true);
+            
+            // Perform both analyses in parallel
+            $analysis = $this->realTimeAnalysisService->analyzeAudioRealTime($audioPath);
+            $spectrumData = $this->realTimeAnalysisService->analyzeFrequencySpectrumRealTime($audioPath);
+            
+            $executionTime = microtime(true) - $startTime;
+
+            Log::info('Comprehensive real-time analysis completed', [
+                'audio_file_id' => $audioFile->id,
+                'execution_time' => round($executionTime, 3),
+                'audio_quality' => $analysis['analysis_quality'],
+                'spectrum_quality' => $spectrumData['analysis_quality'],
+            ]);
+
+            return response()->json([
+                'data' => [
+                    'audio_analysis' => $analysis,
+                    'frequency_spectrum' => $spectrumData,
+                    'execution_time_ms' => round($executionTime * 1000, 2),
+                    'audio_file_id' => $audioFile->id,
+                    'analysis_timestamp' => now()->toISOString(),
+                    'apis_used' => [
+                        'audio' => $analysis['api_source'],
+                        'spectrum' => $spectrumData['api_source'],
+                    ],
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Comprehensive real-time analysis failed', [
+                'audio_file_id' => $audioFile->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'error' => 'Comprehensive real-time analysis failed: ' . $e->getMessage()
             ], 500);
         }
     }

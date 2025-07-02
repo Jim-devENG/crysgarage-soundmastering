@@ -201,11 +201,14 @@ export default function AIMasteringPage() {
       // Apply automatic mastering with genre-specific settings
       const automaticMasterSettings = {
         target_loudness: -8,
+        target_loudness_enabled: true,
         genre_preset: selectedGenre,
         processing_quality: 'standard' as const,
         stereo_width: 20,
+        stereo_width_enabled: true,
         bass_boost: 6,
         presence_boost: 6,
+        boost_enabled: true,
         dynamic_range: 'compressed' as const,
         high_freq_enhancement: true,
         low_freq_enhancement: true,

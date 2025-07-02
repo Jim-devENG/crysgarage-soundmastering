@@ -33,69 +33,7 @@ import MasteringReport from './MasteringReport'
 // import { debounce } from 'lodash'
 import type { AudioFile } from '@/types/audio'
 import EQSection from './EQSection'
-
-interface MasteringSettings {
-  // Limiter Settings
-  limiter_enabled: boolean
-  limiter_threshold: number
-  limiter_release: number
-  limiter_ceiling: number
-  
-  // Automatic Mastering
-  auto_mastering_enabled: boolean
-  target_loudness: number
-  genre_preset: string
-  processing_quality: 'fast' | 'standard' | 'high'
-  
-  // Reference Audio
-  reference_audio_enabled: boolean
-  reference_audio_path?: string
-  
-  // Advanced Options
-  stereo_width: number
-  bass_boost: number
-  presence_boost: number
-  dynamic_range: 'compressed' | 'natural' | 'expanded'
-  high_freq_enhancement: boolean
-  low_freq_enhancement: boolean
-  noise_reduction: boolean
-  
-  // EQ Settings
-  eq_bands: {
-    [key: string]: number
-  }
-}
-
-const defaultSettings: MasteringSettings = {
-  limiter_enabled: true,
-  limiter_threshold: -3.0,
-  limiter_release: 50,
-  limiter_ceiling: -0.3,
-  auto_mastering_enabled: true,
-  target_loudness: -6,
-  genre_preset: 'pop',
-  processing_quality: 'standard',
-  reference_audio_enabled: false,
-  stereo_width: 1.8,
-  bass_boost: 3,
-  presence_boost: 2,
-  dynamic_range: 'compressed',
-  high_freq_enhancement: true,
-  low_freq_enhancement: true,
-  noise_reduction: false,
-  eq_bands: {
-    '32': 2,
-    '64': 3,
-    '125': 1,
-    '250': 0,
-    '500': 0,
-    '1k': 1,
-    '2k': 2,
-    '4k': 1,
-    '8k': 2,
-    '16k': 1
-  }
-}
+import { MasteringSettings } from './MasteringOptions'
 
 const GENRE_PRESETS = [
   { value: 'pop', label: 'Pop', description: 'Bright, punchy, radio-ready' },
@@ -144,46 +82,24 @@ interface LocalSettings {
 
 function toMasteringSettings(local: LocalSettings) {
   return {
-    // Basic mastering settings
+    // AI Mastering Settings
     target_loudness: local.target_loudness,
-    genre_preset: local.genre_preset as any,
+    target_loudness_enabled: local.target_loudness_enabled,
+    genre_preset: local.genre_preset,
     processing_quality: local.processing_quality,
     
-    // Advanced options
+    // Post-Processing
     stereo_width: Math.round(local.stereo_width * 10),
+    stereo_width_enabled: local.stereo_width_enabled,
     bass_boost: local.bass_boost,
     presence_boost: local.presence_boost,
+    boost_enabled: local.boost_enabled,
+    
+    // Advanced Settings
     dynamic_range: local.dynamic_range,
     high_freq_enhancement: true,
     low_freq_enhancement: true,
-    noise_reduction: local.noise_reduction ?? false,
-    
-    // Limiter settings
-    limiter_enabled: local.limiter_enabled,
-    limiter_threshold: local.limiter_threshold,
-    limiter_release: local.limiter_release,
-    limiter_ceiling: local.limiter_ceiling,
-    
-    // Automatic mastering
-    auto_mastering_enabled: local.auto_mastering_enabled,
-    
-    // Reference audio
-    reference_audio_enabled: local.reference_audio_enabled,
-    
-    // EQ settings - convert to the format expected by backend
-    eq_settings: {
-      low_shelf: local.eq_settings.low_shelf,
-      high_shelf: local.eq_settings.high_shelf,
-      presence: local.eq_settings.presence
-    },
-    
-    // Compression settings
-    compression_ratio: local.compression_ratio,
-    attack_time: local.attack_time,
-    release_time: local.release_time,
-    
-    // EQ bands for detailed frequency control
-    eq_bands: local.eq_bands
+    noise_reduction: local.noise_reduction ?? false
   }
 }
 
@@ -350,6 +266,13 @@ export default function CustomMasteringDashboard({ audioFile }: CustomMasteringD
   const visualizerRef = useRef<HTMLCanvasElement>(null)
   const [masteringError, setMasteringError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
+
+  // Real-time analysis state
+  const [analysisData, setAnalysisData] = useState<any>(null)
+  const [spectrumData, setSpectrumData] = useState<any>(null)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [analysisError, setAnalysisError] = useState<string | null>(null)
+  const [lastAnalysisTime, setLastAnalysisTime] = useState<number>(0)
 
   // Load audio URLs
   useEffect(() => {
@@ -884,6 +807,104 @@ export default function CustomMasteringDashboard({ audioFile }: CustomMasteringD
     }
   }
 
+  // Real-time analysis functions
+  const performRealTimeAnalysis = async () => {
+    if (isAnalyzing) return
+    
+    setIsAnalyzing(true)
+    setAnalysisError(null)
+    
+    try {
+      console.log('Starting real-time analysis for audio file:', audioFile.id)
+      const startTime = Date.now()
+      
+      // Perform comprehensive real-time analysis
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/audio/${audioFile.id}/analysis/comprehensive`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Analysis failed: ${response.status} ${response.statusText}`)
+      }
+      
+      const data = await response.json()
+      const executionTime = Date.now() - startTime
+      
+      console.log('Real-time analysis completed in', executionTime, 'ms')
+      
+      setAnalysisData(data.data.audio_analysis)
+      setSpectrumData(data.data.frequency_spectrum)
+      setLastAnalysisTime(executionTime)
+      
+    } catch (error: any) {
+      console.error('Real-time analysis failed:', error)
+      setAnalysisError(error.message || 'Analysis failed')
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
+  const performQuickAnalysis = async () => {
+    if (isAnalyzing) return
+    
+    setIsAnalyzing(true)
+    setAnalysisError(null)
+    
+    try {
+      console.log('Starting quick analysis for audio file:', audioFile.id)
+      const startTime = Date.now()
+      
+      // Perform quick real-time analysis
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/audio/${audioFile.id}/analysis/realtime`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Analysis failed: ${response.status} ${response.statusText}`)
+      }
+      
+      const data = await response.json()
+      const executionTime = Date.now() - startTime
+      
+      console.log('Quick analysis completed in', executionTime, 'ms')
+      
+      setAnalysisData(data.data.analysis)
+      setLastAnalysisTime(executionTime)
+      
+    } catch (error: any) {
+      console.error('Quick analysis failed:', error)
+      setAnalysisError(error.message || 'Analysis failed')
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
+  // Auto-perform analysis when component mounts
+  useEffect(() => {
+    if (audioFile.id && !analysisData) {
+      performQuickAnalysis()
+    }
+  }, [audioFile.id])
+
+  // Auto-refresh analysis every 30 seconds if user is active
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.hasFocus() && audioFile.id) {
+        performQuickAnalysis()
+      }
+    }, 30000) // 30 seconds
+
+    return () => clearInterval(interval)
+  }, [audioFile.id])
+
   return (
     <div className="min-h-screen p-6">
       <div className="max-w-7xl mx-auto">
@@ -1046,18 +1067,157 @@ export default function CustomMasteringDashboard({ audioFile }: CustomMasteringD
                     </div>
                   )}
 
-                  {/* Debug Information */}
-                  {process.env.NODE_ENV === 'development' && (
-                    <div className="mt-4 p-3 bg-gray-900 rounded text-xs">
-                      <div className="text-gray-400 mb-2">Debug Info:</div>
-                      <div>Audio Context: {audioContext ? 'Ready' : 'Not Ready'}</div>
-                      <div>Audio Buffer: {audioBuffer ? 'Loaded' : 'Not Loaded'}</div>
-                      <div>Audio Nodes: {audioNodes.gain ? 'Connected' : 'Not Connected'}</div>
-                      <div>Audio Source: {audioSource ? 'Active' : 'Inactive'}</div>
-                      <div>Context State: {audioContext?.state || 'Unknown'}</div>
-                      <div>Original URL: {originalAudioUrl ? 'Set' : 'Not Set'}</div>
-                    </div>
-                  )}
+                  {/* Real-time Analysis Display */}
+                  <Card className="bg-gray-800/60 border-gray-700/50">
+                    <CardHeader>
+                      <CardTitle className="text-white flex items-center gap-2">
+                        <BarChart3 className="text-blue-400" />
+                        Real-time Analysis
+                        {isAnalyzing && (
+                          <Badge className="bg-yellow-500 text-white text-xs">
+                            Analyzing...
+                          </Badge>
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {/* Analysis Controls */}
+                        <div className="flex gap-2">
+                          <Button 
+                            size="sm" 
+                            onClick={performQuickAnalysis}
+                            disabled={isAnalyzing}
+                            className="flex-1"
+                          >
+                            {isAnalyzing ? 'Analyzing...' : 'Quick Analysis'}
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={performRealTimeAnalysis}
+                            disabled={isAnalyzing}
+                            className="flex-1"
+                          >
+                            Full Analysis
+                          </Button>
+                        </div>
+
+                        {/* Analysis Error */}
+                        {analysisError && (
+                          <div className="p-2 bg-red-900/50 border border-red-500 rounded text-red-300 text-xs">
+                            {analysisError}
+                          </div>
+                        )}
+
+                        {/* Analysis Results */}
+                        {analysisData && (
+                          <div className="space-y-3">
+                            <div className="text-xs text-gray-400">
+                              Last updated: {lastAnalysisTime > 0 ? `${lastAnalysisTime}ms ago` : 'Just now'}
+                            </div>
+                            
+                            {/* Audio Analysis Metrics */}
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div className="bg-gray-900/50 p-2 rounded">
+                                <div className="text-gray-400">RMS Level</div>
+                                <div className="text-white font-mono">{analysisData.rms_level?.toFixed(1) || 'N/A'} dB</div>
+                              </div>
+                              <div className="bg-gray-900/50 p-2 rounded">
+                                <div className="text-gray-400">Peak Level</div>
+                                <div className="text-white font-mono">{analysisData.peak_level?.toFixed(1) || 'N/A'} dB</div>
+                              </div>
+                              <div className="bg-gray-900/50 p-2 rounded">
+                                <div className="text-gray-400">Dynamic Range</div>
+                                <div className="text-white font-mono">{analysisData.dynamic_range?.toFixed(1) || 'N/A'} dB</div>
+                              </div>
+                              <div className="bg-gray-900/50 p-2 rounded">
+                                <div className="text-gray-400">Crest Factor</div>
+                                <div className="text-white font-mono">{analysisData.crest_factor_db?.toFixed(1) || 'N/A'} dB</div>
+                              </div>
+                            </div>
+
+                            {/* Analysis Quality */}
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-gray-400">Analysis Quality</span>
+                              <Badge className={`text-xs ${
+                                analysisData.analysis_quality?.includes('realtime') ? 'bg-green-500' :
+                                analysisData.analysis_quality?.includes('fallback') ? 'bg-yellow-500' :
+                                'bg-blue-500'
+                              } text-white`}>
+                                {analysisData.analysis_quality || 'Unknown'}
+                              </Badge>
+                            </div>
+
+                            {/* Track Information */}
+                            {analysisData.track_info && (
+                              <div className="bg-gray-900/50 p-2 rounded text-xs">
+                                <div className="text-gray-400 mb-1">Track Info</div>
+                                {analysisData.track_info.title && (
+                                  <div className="text-white">Title: {analysisData.track_info.title}</div>
+                                )}
+                                {analysisData.track_info.artist && (
+                                  <div className="text-white">Artist: {analysisData.track_info.artist}</div>
+                                )}
+                                {analysisData.track_info.genre && (
+                                  <div className="text-white">Genre: {analysisData.track_info.genre}</div>
+                                )}
+                                {analysisData.track_info.bpm && (
+                                  <div className="text-white">BPM: {analysisData.track_info.bpm}</div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Audio Features */}
+                            {analysisData.track_info && (
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                {analysisData.track_info.energy !== null && (
+                                  <div className="bg-gray-900/50 p-2 rounded">
+                                    <div className="text-gray-400">Energy</div>
+                                    <div className="text-white">{(analysisData.track_info.energy * 100).toFixed(0)}%</div>
+                                  </div>
+                                )}
+                                {analysisData.track_info.danceability !== null && (
+                                  <div className="bg-gray-900/50 p-2 rounded">
+                                    <div className="text-gray-400">Danceability</div>
+                                    <div className="text-white">{(analysisData.track_info.danceability * 100).toFixed(0)}%</div>
+                                  </div>
+                                )}
+                                {analysisData.track_info.valence !== null && (
+                                  <div className="bg-gray-900/50 p-2 rounded">
+                                    <div className="text-gray-400">Valence</div>
+                                    <div className="text-white">{(analysisData.track_info.valence * 100).toFixed(0)}%</div>
+                                  </div>
+                                )}
+                                {analysisData.track_info.acousticness !== null && (
+                                  <div className="bg-gray-900/50 p-2 rounded">
+                                    <div className="text-gray-400">Acousticness</div>
+                                    <div className="text-white">{(analysisData.track_info.acousticness * 100).toFixed(0)}%</div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* No Analysis Data */}
+                        {!analysisData && !isAnalyzing && (
+                          <div className="text-center text-gray-400 text-xs py-4">
+                            No analysis data available
+                            <br />
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={performQuickAnalysis}
+                              className="mt-2"
+                            >
+                              Start Analysis
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               </CardContent>
             </Card>

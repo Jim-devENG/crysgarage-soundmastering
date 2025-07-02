@@ -5,9 +5,17 @@ namespace App\Services;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
 use Exception;
+use App\Services\WebAudioAnalysisService;
 
 class AdvancedAudioProcessor
 {
+    private $webAnalysisService;
+
+    public function __construct()
+    {
+        $this->webAnalysisService = new WebAudioAnalysisService();
+    }
+
     private const GENRE_PRESETS = [
         'pop' => [
             'target_loudness' => -3,
@@ -659,81 +667,36 @@ class AdvancedAudioProcessor
     }
 
     /**
-     * Analyze processed audio
+     * Analyze processed audio using web API
      */
     public function analyzeAudio(string $audioPath): array
     {
         try {
-            // Check if SoX is available
-            if (!$this->isSoXAvailable()) {
-                Log::info('SoX tool not available, using fallback analysis', [
-                    'audio_path' => $audioPath,
-                ]);
-                
-                // Return fallback analysis data
-                return [
-                    'rms_level' => -20.0,
-                    'peak_level' => -6.0,
-                    'dynamic_range' => 14.0,
-                    'mean_norm' => 0.1,
-                    'max_delta' => 0.8,
-                    'note' => 'Analysis data is estimated (SoX not available)'
-                ];
-            }
-
-            // Use SoX to analyze audio with more detailed statistics
-            $process = new Process([
-                'sox', $audioPath, '-n', 'stat', '2>&1'
+            Log::info('Using web API for audio analysis', [
+                'audio_path' => $audioPath,
             ]);
-            $process->run();
 
-            $output = $process->getOutput();
-            
-            // Parse SoX statistics
-            preg_match('/RMS\s+amplitude\s+([\d.]+)/', $output, $rmsMatches);
-            preg_match('/Peak\s+amplitude:\s+([\d.]+)/', $output, $peakMatches);
-            preg_match('/Mean\s+norm:\s+([\d.]+)/', $output, $meanMatches);
-            preg_match('/Maximum\s+delta:\s+([\d.]+)/', $output, $deltaMatches);
-            preg_match('/RMS\s+tr amplitude\s+([\d.]+)/', $output, $rmsTrMatches);
-            preg_match('/Peak\s+tr amplitude:\s+([\d.]+)/', $output, $peakTrMatches);
-
-            // Calculate loudness (approximate)
-            $rms = $rmsMatches[1] ?? 0;
-            $peak = $peakMatches[1] ?? 0;
-            $loudness = $rms > 0 ? 20 * log10($rms) : -60;
-            $peakDb = $peak > 0 ? 20 * log10($peak) : -60;
-
-            // Calculate dynamic range
-            $dynamicRange = $rms > 0 && $peak > 0 ? 20 * log10($peak / $rms) : 0;
-
-            // Calculate crest factor (peak to RMS ratio)
-            $crestFactor = $rms > 0 ? $peak / $rms : 0;
-            $crestFactorDb = $crestFactor > 0 ? 20 * log10($crestFactor) : 0;
-
-            return [
-                'rms_level' => round($loudness, 1),
-                'peak_level' => round($peakDb, 1),
-                'dynamic_range' => round($dynamicRange, 1),
-                'mean_norm' => round($meanMatches[1] ?? 0, 3),
-                'max_delta' => round($deltaMatches[1] ?? 0, 3),
-                'crest_factor_db' => round($crestFactorDb, 1),
-                'rms_amplitude' => round($rms, 4),
-                'peak_amplitude' => round($peak, 4),
-                'analysis_quality' => 'sox_analysis'
-            ];
+            // Use web API service for analysis
+            return $this->webAnalysisService->analyzeAudio($audioPath);
 
         } catch (Exception $e) {
-            Log::warning('Audio analysis failed', ['error' => $e->getMessage()]);
+            Log::error('Web API audio analysis failed', [
+                'error' => $e->getMessage(),
+                'audio_path' => $audioPath,
+            ]);
+            
             return [
-                'rms_level' => 0,
-                'peak_level' => 0,
-                'dynamic_range' => 0,
-                'mean_norm' => 0,
-                'max_delta' => 0,
-                'crest_factor_db' => 0,
-                'rms_amplitude' => 0,
-                'peak_amplitude' => 0,
-                'analysis_quality' => 'fallback'
+                'rms_level' => -20.0,
+                'peak_level' => -6.0,
+                'dynamic_range' => 14.0,
+                'mean_norm' => 0.1,
+                'max_delta' => 0.8,
+                'crest_factor_db' => 14.0,
+                'rms_amplitude' => 0.1,
+                'peak_amplitude' => 0.5,
+                'analysis_quality' => 'fallback',
+                'api_source' => 'fallback_analysis',
+                'note' => 'Analysis failed, using fallback data'
             ];
         }
     }
