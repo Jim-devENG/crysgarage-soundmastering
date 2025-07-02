@@ -189,9 +189,9 @@ class AdvancedAudioProcessor
         string $outputPath,
         array $settings
     ): array {
-        Log::info('Starting advanced audio processing', [
-            'input_path' => $inputPath,
-            'output_path' => $outputPath,
+            Log::info('Starting advanced audio processing', [
+                'input_path' => $inputPath,
+                'output_path' => $outputPath,
             'settings' => $settings,
         ]);
 
@@ -237,7 +237,7 @@ class AdvancedAudioProcessor
                         $result['mastering_changes'] = $this->analyzeMasteringChanges($inputPath, $outputPath);
                         
                         Log::info('Advanced processing completed with AI + aggressive local processing', [
-                            'output_path' => $outputPath,
+                'output_path' => $outputPath,
                             'changes' => $result['mastering_changes']['significant_changes'] ?? [],
                         ]);
                         
@@ -266,7 +266,7 @@ class AdvancedAudioProcessor
                 'output_path' => $outputPath,
                 'changes' => $result['mastering_changes']['significant_changes'] ?? [],
             ]);
-            
+
             return $result;
 
         } catch (\Exception $e) {
@@ -673,9 +673,9 @@ class AdvancedAudioProcessor
     {
         try {
             Log::info('Using web API for audio analysis', [
-                'audio_path' => $audioPath,
-            ]);
-
+                    'audio_path' => $audioPath,
+                ]);
+                
             // Use web API service for analysis
             return $this->webAnalysisService->analyzeAudio($audioPath);
 
@@ -685,12 +685,12 @@ class AdvancedAudioProcessor
                 'audio_path' => $audioPath,
             ]);
             
-            return [
-                'rms_level' => -20.0,
-                'peak_level' => -6.0,
-                'dynamic_range' => 14.0,
-                'mean_norm' => 0.1,
-                'max_delta' => 0.8,
+                return [
+                    'rms_level' => -20.0,
+                    'peak_level' => -6.0,
+                    'dynamic_range' => 14.0,
+                    'mean_norm' => 0.1,
+                    'max_delta' => 0.8,
                 'crest_factor_db' => 14.0,
                 'rms_amplitude' => 0.1,
                 'peak_amplitude' => 0.5,
