@@ -2,7 +2,7 @@ import axios from 'axios'
 import { getSession } from 'next-auth/react'
 import { MasteringSettings } from '@/components/MasteringOptions'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://your-domain.com/api'
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -63,8 +63,8 @@ export const audioApi = {
     const authHeader = await getAuthHeader()
     const response = await apiClient.post('/audio/upload', formData, {
       headers: {
-        'Content-Type': 'multipart/form-data',
         ...authHeader,
+        // Remove Content-Type header - let axios set it automatically for FormData
       },
       onUploadProgress: (progressEvent) => {
         const percentCompleted = Math.round(
