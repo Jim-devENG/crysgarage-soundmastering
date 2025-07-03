@@ -1,0 +1,59 @@
+#!/bin/bash
+
+echo "Starting deployment..."
+
+cd /var/www/audio-app
+
+# Pull latest changes
+git pull origin main
+
+# Backend fixes
+cd backend
+
+# Set proper permissions
+sudo chown -R apache:apache storage/
+sudo chown -R apache:apache bootstrap/cache/
+sudo chmod -R 775 storage/
+sudo chmod -R 775 bootstrap/cache/
+sudo chmod -R 777 storage/app/public/audio/
+sudo chmod -R 777 storage/app/private/audio/
+
+# Create storage directories if they don't exist
+mkdir -p storage/app/public/audio/original
+mkdir -p storage/app/public/audio/mastered
+mkdir -p storage/app/private/audio/original
+
+# Create storage link
+php artisan storage:link
+
+# Clear all caches
+php artisan config:clear
+php artisan cache:clear
+php artisan route:clear
+php artisan view:clear
+
+# Optimize for production
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+
+# Install dependencies
+composer install --no-dev --optimize-autoloader
+
+# Frontend fixes
+cd ../frontend
+
+# Install dependencies
+npm install
+
+# Build for production
+npm run build
+
+# Restart frontend
+pm2 restart frontend
+
+# Set final permissions
+sudo chown -R apache:apache /var/www/audio-app
+sudo chmod -R 755 /var/www/audio-app
+
+echo "Deployment completed successfully!" 
