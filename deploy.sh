@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Starting deployment..."
+echo "Starting comprehensive deployment..."
 
 cd /var/www/audio-app
 
@@ -50,6 +50,23 @@ return [
 ];
 EOF
 
+# Run database migrations
+php artisan migrate --force
+
+# Create test user if not exists
+php artisan tinker --execute="
+if (!\App\Models\User::where('email', 'test@example.com')->exists()) {
+    \App\Models\User::create([
+        'name' => 'Test User',
+        'email' => 'test@example.com',
+        'password' => Hash::make('password123'),
+    ]);
+    echo 'Test user created successfully!';
+} else {
+    echo 'Test user already exists!';
+}
+"
+
 # Clear all caches
 php artisan config:clear
 php artisan cache:clear
@@ -83,4 +100,8 @@ sudo chmod -R 755 /var/www/audio-app
 # Restart Apache to apply CORS changes
 sudo systemctl restart httpd
 
-echo "Deployment completed successfully!" 
+# Test the API
+echo "Testing API endpoints..."
+curl -s http://localhost/api/audio > /dev/null && echo "API is accessible" || echo "API test failed"
+
+echo "Comprehensive deployment completed successfully!" 

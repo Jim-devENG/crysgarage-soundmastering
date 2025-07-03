@@ -24,6 +24,7 @@ export default function AudioUploader({ wavOnly = false, onUploadComplete, onErr
       setUploading(true)
       setError(null)
       setProgress(0)
+      console.log('Starting upload for file:', file.name, 'Size:', file.size)
 
       // Use different upload method based on wavOnly prop
       let response
@@ -37,7 +38,9 @@ export default function AudioUploader({ wavOnly = false, onUploadComplete, onErr
         response = await audioApi.uploadAudio(file)
       }
       
-      const audioFileId = response.data?.id || response.id
+      console.log('Upload response:', response)
+      
+      const audioFileId = response.data?.id || response.id || response.audio_file?.id
       setJobId(audioFileId)
 
       // Call the onUploadComplete callback if provided
@@ -55,7 +58,7 @@ export default function AudioUploader({ wavOnly = false, onUploadComplete, onErr
           if (status.status === 'completed') {
             clearInterval(pollInterval)
             setUploading(false)
-            // Handle completion - maybe redirect to results page
+            console.log('Processing completed successfully')
           } else if (status.status === 'failed') {
             clearInterval(pollInterval)
             const errorMsg = status.error_message || 'Processing failed'
@@ -72,6 +75,7 @@ export default function AudioUploader({ wavOnly = false, onUploadComplete, onErr
         }
       }, 2000)
     } catch (err: any) {
+      console.error('Upload error:', err)
       const errorMsg = err.message || 'Upload failed'
       setError(errorMsg)
       if (onError) onError(errorMsg)
