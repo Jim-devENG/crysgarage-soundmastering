@@ -26,6 +26,30 @@ mkdir -p storage/app/private/audio/original
 # Create storage link
 php artisan storage:link
 
+# Fix CORS configuration
+cat > config/cors.php << 'EOF'
+<?php
+
+return [
+    'paths' => ['api/*', 'sanctum/csrf-cookie'],
+    'allowed_methods' => ['*'],
+    'allowed_origins' => [
+        'http://localhost:3000', 
+        'http://localhost:3001', 
+        'http://crysgarage.studio:3000',
+        'http://crysgarage.studio',
+        'https://crysgarage.studio:3000',
+        'https://crysgarage.studio',
+        '*'
+    ],
+    'allowed_origins_patterns' => [],
+    'allowed_headers' => ['*'],
+    'exposed_headers' => ['Content-Disposition', 'Content-Length', 'Content-Type'],
+    'max_age' => 0,
+    'supports_credentials' => true,
+];
+EOF
+
 # Clear all caches
 php artisan config:clear
 php artisan cache:clear
@@ -55,5 +79,8 @@ pm2 restart frontend
 # Set final permissions
 sudo chown -R apache:apache /var/www/audio-app
 sudo chmod -R 755 /var/www/audio-app
+
+# Restart Apache to apply CORS changes
+sudo systemctl restart httpd
 
 echo "Deployment completed successfully!" 
