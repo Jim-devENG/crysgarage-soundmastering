@@ -1,104 +1,116 @@
 'use client'
 
-import React, { useRef, useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Play, Pause, Volume2, VolumeX, RotateCcw } from 'lucide-react'
+import { useState } from 'react'
+import { Play, Pause, Volume2 } from 'lucide-react'
 
 interface AudioComparisonProps {
-  originalUrl: string
-  masteredUrl: string
-  onComparisonChange?: (isComparing: boolean) => void
+  originalPath?: string
+  masteredPath?: string
+  masteringType?: 'automatic' | 'advanced'
 }
 
-export default function AudioComparison({ 
-  originalUrl, 
-  masteredUrl, 
-  onComparisonChange 
-}: AudioComparisonProps) {
-  const originalAudioRef = useRef<HTMLAudioElement>(null)
-  const masteredAudioRef = useRef<HTMLAudioElement>(null)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [isComparing, setIsComparing] = useState(false)
-  const [currentTrack, setCurrentTrack] = useState<'original' | 'mastered'>('original')
-  const [currentTime, setCurrentTime] = useState(0)
-  const [duration, setDuration] = useState(0)
+export default function AudioComparison({ originalPath, masteredPath, masteringType = 'automatic' }: AudioComparisonProps) {
+  const [isPlayingOriginal, setIsPlayingOriginal] = useState(false)
+  const [isPlayingMastered, setIsPlayingMastered] = useState(false)
+  const [originalAudio, setOriginalAudio] = useState<HTMLAudioElement | null>(null)
+  const [masteredAudio, setMasteredAudio] = useState<HTMLAudioElement | null>(null)
 
-  const togglePlay = () => {
-    const originalAudio = originalAudioRef.current
-    const masteredAudio = masteredAudioRef.current
-
-    if (!originalAudio || !masteredAudio) return
-
-    if (isPlaying) {
-      originalAudio.pause()
-      masteredAudio.pause()
-      setIsPlaying(false)
+  const toggleOriginal = () => {
+    if (!originalAudio) {
+      const audio = new Audio(originalPath)
+      audio.onended = () => setIsPlayingOriginal(false)
+      setOriginalAudio(audio)
+      audio.play()
+      setIsPlayingOriginal(true)
     } else {
-      if (isComparing) {
-        originalAudio.currentTime = currentTime
-        masteredAudio.currentTime = currentTime
-        originalAudio.play()
-        masteredAudio.play()
+      if (isPlayingOriginal) {
+        originalAudio.pause()
+        setIsPlayingOriginal(false)
       } else {
-        const audio = currentTrack === 'original' ? originalAudio : masteredAudio
-        audio.currentTime = currentTime
-        audio.play()
+        originalAudio.play()
+        setIsPlayingOriginal(true)
       }
-      setIsPlaying(true)
     }
   }
 
-  const toggleComparison = () => {
-    setIsComparing(!isComparing)
-    onComparisonChange?.(!isComparing)
-  }
-
-  const formatTime = (time: number) => {
-    const minutes = Math.floor(time / 60)
-    const seconds = Math.floor(time % 60)
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`
+  const toggleMastered = () => {
+    if (!masteredAudio) {
+      const audio = new Audio(masteredPath)
+      audio.onended = () => setIsPlayingMastered(false)
+      setMasteredAudio(audio)
+      audio.play()
+      setIsPlayingMastered(true)
+    } else {
+      if (isPlayingMastered) {
+        masteredAudio.pause()
+        setIsPlayingMastered(false)
+      } else {
+        masteredAudio.play()
+        setIsPlayingMastered(true)
+      }
+    }
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>A/B Comparison</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex gap-2">
-          <Button
-            variant={currentTrack === 'original' ? "default" : "outline"}
-            onClick={() => setCurrentTrack('original')}
-            disabled={isComparing}
+    <div className="bg-gradient-to-r from-gray-800/60 to-gray-700/60 border border-gray-600/50 backdrop-blur-sm rounded-xl p-6">
+      <h3 className="text-xl font-bold text-white mb-6 text-center">Before & After Comparison</h3>
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Original */}
+        <div className="text-center p-6 bg-white/5 rounded-xl border border-white/10">
+          <h4 className="text-lg font-semibold text-white mb-4">Original Track</h4>
+          <div className="w-16 h-16 bg-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Volume2 className="w-8 h-8 text-white" />
+          </div>
+          <button
+            onClick={toggleOriginal}
+            className="px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
           >
-            Original
-          </Button>
-          <Button
-            variant={currentTrack === 'mastered' ? "default" : "outline"}
-            onClick={() => setCurrentTrack('mastered')}
-            disabled={isComparing}
+            {isPlayingOriginal ? (
+              <>
+                <Pause className="w-5 h-5 inline mr-2" />
+                Pause
+              </>
+            ) : (
+              <>
+                <Play className="w-5 h-5 inline mr-2" />
+                Play Original
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Mastered */}
+        <div className="text-center p-6 bg-gradient-to-r from-red-500/10 to-purple-500/10 rounded-xl border border-red-500/20">
+          <h4 className="text-lg font-semibold text-white mb-4">
+            {masteringType === 'automatic' ? 'Automatic Master' : 'Advanced Master'}
+          </h4>
+          <div className="w-16 h-16 bg-gradient-to-r from-red-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Volume2 className="w-8 h-8 text-white" />
+          </div>
+          <button
+            onClick={toggleMastered}
+            className="px-6 py-3 bg-gradient-to-r from-red-500 to-purple-600 hover:from-red-600 hover:to-purple-700 text-white rounded-lg font-medium transition-colors"
           >
-            Mastered
-          </Button>
+            {isPlayingMastered ? (
+              <>
+                <Pause className="w-5 h-5 inline mr-2" />
+                Pause
+              </>
+            ) : (
+              <>
+                <Play className="w-5 h-5 inline mr-2" />
+                Play Mastered
+              </>
+            )}
+          </button>
         </div>
-
-        <div className="flex items-center justify-center gap-4">
-          <Button onClick={togglePlay}>
-            {isPlaying ? <Pause /> : <Play />}
-          </Button>
-          <Button variant="outline" onClick={toggleComparison}>
-            {isComparing ? "Exit Comparison" : "Start Comparison"}
-          </Button>
-        </div>
-
-        <div className="text-center">
-          {formatTime(currentTime)} / {formatTime(duration)}
-        </div>
-
-        <audio ref={originalAudioRef} src={originalUrl} preload="metadata" />
-        <audio ref={masteredAudioRef} src={masteredUrl} preload="metadata" />
-      </CardContent>
-    </Card>
+      </div>
+      
+      <div className="mt-6 text-center">
+        <p className="text-gray-400 text-sm">
+          Compare the original track with the mastered version to hear the difference
+        </p>
+      </div>
+    </div>
   )
 } 
