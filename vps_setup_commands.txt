@@ -1,0 +1,168 @@
+# Copy and paste these commands into your VPS terminal
+
+# 1. Navigate to project directory
+cd /home/ubuntu/crys-fresh
+
+# 2. Pull latest changes
+git fetch origin
+git reset --hard origin/main
+git clean -fd
+
+# 3. Setup Backend
+cd backend
+composer install --no-dev --optimize-autoloader
+sudo chown -R www-data:www-data storage bootstrap/cache
+sudo chmod -R 775 storage bootstrap/cache
+
+if [ ! -f .env ]; then
+    cp .env.example .env
+    php artisan key:generate
+fi
+
+php artisan migrate --force
+php artisan config:clear
+php artisan cache:clear
+php artisan route:clear
+php artisan view:clear
+cd ..
+
+# 4. Setup Frontend
+cd frontend
+npm install
+npm run build
+cd ..
+
+# 5. Create webhook directory and script
+sudo mkdir -p /var/www/webhook
+
+sudo tee /var/www/webhook/deploy.php > /dev/null << 'EOF'
+<?php
+header('Content-Type: application/json');
+
+$log_file = '/var/www/webhook/deploy.log';
+$timestamp = date('Y-m-d H:i:s');
+file_put_contents($log_file, "[$timestamp] Webhook received\n", FILE_APPEND);
+
+$project_dir = '/home/ubuntu/crys-fresh';
+$deploy_script = "$project_dir/deploy.sh";
+
+if (file_exists($deploy_script)) {
+    $output = shell_exec("cd $project_dir && bash $deploy_script 2>&1");
+    file_put_contents($log_file, "[$timestamp] Deployment output: $output\n", FILE_APPEND);
+    echo json_encode(['status' => 'success', 'message' => 'Deployment started']);
+} else {
+    file_put_contents($log_file, "[$timestamp] Error: Deploy script not found\n", FILE_APPEND);
+    http_response_code(500);
+    echo json_encode(['error' => 'Deploy script not found']);
+}
+?>
+EOF
+
+sudo chown -R www-data:www-data /var/www/webhook
+sudo chmod +x /var/www/webhook/deploy.php
+
+# 6. Create deploy script
+tee deploy.sh > /dev/null << 'EOF'
+#!/bin/bash
+set -e
+
+echo "🚀 Starting deployment..."
+
+git fetch origin
+git reset --hard origin/main
+git clean -fd
+
+cd backend
+composer install --no-dev --optimize-autoloader
+php artisan migrate --force
+php artisan config:clear
+php artisan cache:clear
+php artisan route:clear
+php artisan view:clear
+sudo chown -R www-data:www-data storage bootstrap/cache
+sudo chmod -R 775 storage bootstrap/cache
+cd ..
+
+cd frontend
+npm install
+npm run build
+cd ..
+
+pm2 restart all
+
+echo "✅ Deployment completed!"
+EOF
+
+chmod +x deploy.sh
+
+# 7. Stop existing services
+pm2 stop all 2>/dev/null || true
+sudo systemctl stop apache2 2>/dev/null || true
+
+# 8. Start services
+cd backend
+pm2 start "php artisan serve --host=0.0.0.0 --port=8000" --name "laravel-backend"
+cd ..
+
+cd frontend
+pm2 start "npm start" --name "nextjs-frontend"
+cd ..
+
+# 9. Configure Apache
+sudo a2enmod proxy
+sudo a2enmod proxy_http
+sudo a2enmod proxy_wstunnel
+
+sudo tee /etc/apache2/sites-available/000-default.conf > /dev/null << 'EOF'
+<VirtualHost *:80>
+    ServerName your-domain.com
+    DocumentRoot /var/www/html
+    
+    ProxyPreserveHost On
+    ProxyPass / http://localhost:3000/
+    ProxyPassReverse / http://localhost:3000/
+    
+    ProxyPass /api http://localhost:8000/api
+    ProxyPassReverse /api http://localhost:8000/api
+    
+    ProxyPass /auth http://localhost:8000/auth
+    ProxyPassReverse /auth http://localhost:8000/auth
+    
+    ProxyPass /storage http://localhost:8000/storage
+    ProxyPassReverse /storage http://localhost:8000/storage
+    
+    RewriteEngine on
+    RewriteCond %{HTTP:Upgrade} websocket [NC]
+    RewriteCond %{HTTP:Connection} upgrade [NC]
+    RewriteRule ^/?(.*) "ws://localhost:3000/$1" [P,L]
+</VirtualHost>
+EOF
+
+sudo systemctl start apache2
+sudo systemctl enable apache2
+sudo systemctl restart apache2
+
+# 10. Save PM2 configuration
+pm2 save
+pm2 startup
+
+# 11. Get server IP and display webhook URL
+SERVER_IP=$(curl -s ifconfig.me)
+WEBHOOK_URL="http://$SERVER_IP/deploy.php"
+
+echo "🎉 Setup completed successfully!"
+echo ""
+echo "Webhook URL: $WEBHOOK_URL"
+echo ""
+echo "Next steps:"
+echo "1. Go to your GitHub repository"
+echo "2. Go to Settings > Webhooks"
+echo "3. Click 'Add webhook'"
+echo "4. Set Payload URL to: $WEBHOOK_URL"
+echo "5. Set Content type to: application/json"
+echo "6. Select 'Just the push event'"
+echo "7. Click 'Add webhook'"
+echo ""
+echo "Your application should now be running at:"
+echo "Frontend: http://$SERVER_IP"
+echo "Backend API: http://$SERVER_IP/api" 

@@ -58,36 +58,50 @@ class AudioFileController extends Controller
      */
     public function upload(Request $request): JsonResponse
     {
-        $allowedMimeTypes = config('audio.supported_formats.mime_types');
-        $allowedExtensions = implode(',', config('audio.supported_formats.extensions'));
-        $maxFileSize = config('audio.file_size.max_upload_size_kb');
-
-        $request->validate([
-            'audio' => [
-                'required', 
-                'file', 
-                'max:' . $maxFileSize,
-                'mimes:' . $allowedExtensions
-            ],
-        ]);
-
-        $file = $request->file('audio');
-        
-        // Additional MIME type validation
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        $mimeType = finfo_file($finfo, $file->getPathname());
-        finfo_close($finfo);
-
-        if (!in_array($mimeType, $allowedMimeTypes)) {
-            return response()->json([
-                'message' => 'Unsupported file type',
-                'error' => 'The uploaded file type is not supported. Please upload a valid audio file.',
-            ], 422);
-        }
-
         try {
+            Log::info('Audio upload request received', [
+                'user_id' => $request->user()?->id,
+                'file_present' => $request->hasFile('audio'),
+                'content_type' => $request->header('Content-Type'),
+                'content_length' => $request->header('Content-Length'),
+            ]);
+
+            $allowedMimeTypes = config('audio.supported_formats.mime_types');
+            $allowedExtensions = implode(',', config('audio.supported_formats.extensions'));
+            $maxFileSize = config('audio.file_size.max_upload_size_kb');
+
+            $request->validate([
+                'audio' => [
+                    'required', 
+                    'file', 
+                    'max:' . $maxFileSize,
+                    'mimes:' . $allowedExtensions
+                ],
+            ]);
+
+            $file = $request->file('audio');
+            
+            Log::info('File validation passed', [
+                'original_name' => $file->getClientOriginalName(),
+                'size' => $file->getSize(),
+                'mime_type' => $file->getMimeType(),
+            ]);
+            
+            // Additional MIME type validation
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mimeType = finfo_file($finfo, $file->getPathname());
+            finfo_close($finfo);
+
+            if (!in_array($mimeType, $allowedMimeTypes)) {
+                Log::warning('Invalid MIME type', ['mime_type' => $mimeType]);
+                return response()->json([
+                    'message' => 'Unsupported file type',
+                    'error' => 'The uploaded file type is not supported. Please upload a valid audio file.',
+                ], 422);
+            }
+
             $user = $request->user();
-        $originalFilename = $file->getClientOriginalName();
+            $originalFilename = $file->getClientOriginalName();
             $fileSize = $file->getSize();
             $extension = $file->getClientOriginalExtension();
 
@@ -95,14 +109,23 @@ class AudioFileController extends Controller
             $filename = uniqid() . '_' . time() . '.' . $extension;
             $path = $file->storeAs('audio/original', $filename, 'public');
 
+            Log::info('File stored successfully', [
+                'path' => $path,
+                'filename' => $filename,
+            ]);
+
             // Create audio file record
-        $audioFile = AudioFile::create([
+            $audioFile = AudioFile::create([
                 'user_id' => $user->id,
-            'original_filename' => $originalFilename,
-            'original_path' => $path,
+                'original_filename' => $originalFilename,
+                'original_path' => $path,
                 'file_size' => $fileSize,
-            'mime_type' => $mimeType,
+                'mime_type' => $mimeType,
                 'status' => 'uploaded'
+            ]);
+
+            Log::info('Audio file record created', [
+                'audio_file_id' => $audioFile->id,
             ]);
 
             return response()->json([
@@ -111,10 +134,16 @@ class AudioFileController extends Controller
             ], 201);
 
         } catch (\Exception $e) {
-            \Log::error('Audio upload failed: ' . $e->getMessage());
+            Log::error('Audio upload failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => $request->user()?->id,
+            ]);
+            
             return response()->json([
                 'message' => 'Upload failed',
                 'error' => 'Failed to upload audio file. Please try again.',
+                'debug' => $e->getMessage(),
             ], 500);
         }
     }
