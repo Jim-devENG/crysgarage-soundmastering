@@ -362,11 +362,9 @@ export default function AudioDetailPage() {
             <TabsContent value="comparison" className="space-y-6">
               {audioFile.mastered_url && (
                 <AudioComparison
-                  originalUrl={audioFile.original_url || ''}
-                  masteredUrl={audioFile.mastered_url || ''}
-                  onComparisonChange={(isComparing) => {
-                    console.log('Comparison mode:', isComparing)
-                  }}
+                  originalPath={audioFile.original_url || ''}
+                  masteredPath={audioFile.mastered_url || ''}
+                  masteringType="automatic"
                 />
               )}
             </TabsContent>
