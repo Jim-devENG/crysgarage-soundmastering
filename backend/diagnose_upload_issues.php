@@ -222,8 +222,8 @@ foreach ($phpSettings as $setting => $value) {
 }
 
 // Check if upload limits are sufficient
-$uploadMax = $this->parseSize(ini_get('upload_max_filesize'));
-$postMax = $this->parseSize(ini_get('post_max_size'));
+$uploadMax = parseSize(ini_get('upload_max_filesize'));
+$postMax = parseSize(ini_get('post_max_size'));
 $configMax = config('audio.file_size.max_upload_size');
 
 if ($uploadMax < $configMax) {
@@ -274,7 +274,7 @@ try {
         $logSize = filesize($logFile);
         $logLines = count(file($logFile));
         echo "   - Log File: {$logFile}\n";
-        echo "   - Size: " . $this->formatBytes($logSize) . "\n";
+        echo "   - Size: " . formatBytes($logSize) . "\n";
         echo "   - Lines: {$logLines}\n";
         
         // Check for recent errors
