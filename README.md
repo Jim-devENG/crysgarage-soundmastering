@@ -294,3 +294,75 @@ For issues and support:
 - [API Documentation](http://localhost:8000/api/documentation)
 - [Laravel Documentation](https://laravel.com/docs)
 - [Next.js Documentation](https://nextjs.org/docs)
+
+## 🧹 Safe Cleanup Script
+
+To safely clean up build artifacts, logs, and caches without risking source code or important directories, use the following script:
+
+```bash
+#!/bin/bash
+# safe_cleanup.sh
+# Safely cleans Laravel and Next.js build artifacts, logs, and caches.
+
+set -e
+
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+function print_success() {
+    echo -e "${GREEN}$1${NC}"
+}
+function print_warn() {
+    echo -e "${YELLOW}$1${NC}"
+}
+
+print_success "--- Cleaning up Laravel backend ---"
+cd backend
+
+# Check for PHP
+if command -v php >/dev/null 2>&1; then
+    php artisan config:clear || true
+    php artisan cache:clear || true
+    php artisan route:clear || true
+    php artisan view:clear || true
+else
+    print_warn "PHP not found, skipping Laravel cache clear."
+fi
+
+# Remove only log files, not directories
+find storage/logs/ -type f -name "*.log" -delete
+
+# Remove only cache/session/view files, not directories
+find storage/framework/cache/ -type f -delete
+find storage/framework/sessions/ -type f -delete
+find storage/framework/views/ -type f -delete
+
+cd ..
+
+print_success "--- Cleaning up Next.js frontend ---"
+cd frontend
+
+# Remove build artifacts only
+rm -rf .next
+
+cd ..
+
+print_success "--- Project root: showing untracked files (not deleting) ---"
+git clean -fdn
+
+print_warn "If you want to delete the above untracked files, run: git clean -fd"
+
+print_success "Safe cleanup complete!"
+```
+
+**Usage:**
+
+1. Save as `safe_cleanup.sh` in your project root.
+2. Run it from a Linux shell, WSL, or your server:
+   ```bash
+   bash safe_cleanup.sh
+   ```
+
+- The script will only remove safe files and show you untracked files before deleting anything extra.
+- It will skip Laravel cache clearing if PHP is not available.

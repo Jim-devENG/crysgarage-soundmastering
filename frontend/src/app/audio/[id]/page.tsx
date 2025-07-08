@@ -328,7 +328,7 @@ export default function AudioDetailPage() {
               <div className="flex items-center">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-3"></div>
                 <div>
-                  <h3 className="font-semibold text-white">Mastering your audio file...</h3>
+                  <h3 className="font-semibold text-white">Sound mastering your audio file...</h3>
                   <p className="text-gray-400">Applying AI mastering and enhancements.</p>
                 </div>
               </div>
@@ -408,7 +408,7 @@ export default function AudioDetailPage() {
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-400">AI Processing Time:</span>
+                      <span className="text-gray-400">Processing Time:</span>
                       <span className="font-mono">
                         {audioFile.metadata?.ai_processing_time ? 
                           `${audioFile.metadata.ai_processing_time}s` : 'N/A'}
