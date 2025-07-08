@@ -11,9 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('audio_files', function (Blueprint $table) {
-            $table->string('mp3_path')->nullable()->after('mastered_path');
-        });
+        // mp3_path already exists from the initial migration. No action needed.
     }
 
     /**
@@ -21,8 +19,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('audio_files', function (Blueprint $table) {
-            $table->dropColumn('mp3_path');
-        });
+        // mp3_path already exists from the initial migration. No action needed.
     }
 };
