@@ -2,119 +2,62 @@ name: Deploy to VPS
 
 on:
   push:
-    branches: [main, master]
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Deploy to VPS
-        uses: appleboy/ssh-action@v0.1.5
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
+          username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
+          port: ${{ secrets.VPS_PORT || 22 }}
           script: |
-            cd /var/www/audio-app
-            git pull origin main
+            # Navigate to your project directory
+            cd /root/audio-app
 
-            # Backend fixes
+            # Pull latest changes
+            git pull origin master
+
+            # Install/update backend dependencies
             cd backend
+            composer install --no-dev --optimize-autoloader
 
-            # Set proper permissions
-            sudo chown -R apache:apache storage/
-            sudo chown -R apache:apache bootstrap/cache/
-            sudo chmod -R 775 storage/
-            sudo chmod -R 775 bootstrap/cache/
-            sudo chmod -R 777 storage/app/public/audio/
-            sudo chmod -R 777 storage/app/private/audio/
-
-            # Create storage directories if they don't exist
-            mkdir -p storage/app/public/audio/original
-            mkdir -p storage/app/public/audio/mastered
-            mkdir -p storage/app/private/audio/original
-
-            # Create storage link
-            php artisan storage:link
-
-            # Fix CORS configuration
-            cat > config/cors.php << 'EOF'
-            <?php
-
-            return [
-                'paths' => ['api/*', 'sanctum/csrf-cookie'],
-                'allowed_methods' => ['*'],
-                'allowed_origins' => [
-                    'http://localhost:3000', 
-                    'http://localhost:3001', 
-                    'http://crysgarage.studio:3000',
-                    'http://crysgarage.studio',
-                    'https://crysgarage.studio:3000',
-                    'https://crysgarage.studio',
-                    '*'
-                ],
-                'allowed_origins_patterns' => [],
-                'allowed_headers' => ['*'],
-                'exposed_headers' => ['Content-Disposition', 'Content-Length', 'Content-Type'],
-                'max_age' => 0,
-                'supports_credentials' => true,
-            ];
-            EOF
-
-            # Run database migrations
-            php artisan migrate --force
-
-            # Create test user if not exists
-            php artisan tinker --execute="
-            if (!\App\Models\User::where('email', 'test@example.com')->exists()) {
-                \App\Models\User::create([
-                    'name' => 'Test User',
-                    'email' => 'test@example.com',
-                    'password' => Hash::make('password123'),
-                ]);
-                echo 'Test user created successfully!';
-            } else {
-                echo 'Test user already exists!';
-            }
-            "
-
-            # Clear all caches
+            # Clear Laravel caches
             php artisan config:clear
             php artisan cache:clear
             php artisan route:clear
             php artisan view:clear
 
-            # Optimize for production
-            php artisan config:cache
-            php artisan route:cache
-            php artisan view:cache
+            # Run database migrations (if any)
+            php artisan migrate --force
 
-            # Install dependencies
-            composer install --no-dev --optimize-autoloader
-
-            # Frontend fixes
+            # Install/update frontend dependencies
             cd ../frontend
-
-            # Install dependencies
             npm install
 
-            # Build for production
+            # Build frontend
             npm run build
 
-            # Restart frontend
-            pm2 restart frontend
+            # Restart backend services (adjust based on your setup)
+            # If using PM2:
+            pm2 restart laravel-backend || pm2 start "php artisan serve --host=0.0.0.0 --port=8000" --name laravel-backend
 
-            # Set final permissions
-            sudo chown -R apache:apache /var/www/audio-app
-            sudo chmod -R 755 /var/www/audio-app
+            # If using systemd:
+            # sudo systemctl restart your-backend-service
 
-            # Restart Apache to apply CORS changes
-            sudo systemctl restart httpd
+            # If using Apache/Nginx, just restart the web server:
+            # sudo systemctl restart apache2
+            # or
+            # sudo systemctl restart nginx
 
-            # Test the API
-            echo "Testing API endpoints..."
-            curl -s http://localhost/api/audio > /dev/null && echo "API is accessible" || echo "API test failed"
-
-            echo "Comprehensive deployment completed successfully!"
+            echo "Deployment completed successfully!"
