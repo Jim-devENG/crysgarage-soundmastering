@@ -43,7 +43,7 @@ Route::get('/test-download/{path}', function ($path) {
         'Content-Type' => $mimeType,
         'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         'Content-Length' => filesize($fullPath),
-        'Access-Control-Allow-Origin' => 'http://localhost:3000',
+        'Access-Control-Allow-Origin' => 'http://crysgarage.studio:3000',
         'Access-Control-Allow-Methods' => 'GET, OPTIONS',
         'Access-Control-Allow-Headers' => 'Content-Type, Authorization, X-Requested-With',
         'Access-Control-Allow-Credentials' => 'true',
@@ -62,7 +62,7 @@ Route::get('/storage/{path}', function ($path) {
     
     return response()->file($fullPath, [
         'Content-Type' => $mimeType,
-        'Access-Control-Allow-Origin' => 'http://localhost:3000',
+        'Access-Control-Allow-Origin' => 'http://crysgarage.studio:3000',
         'Access-Control-Allow-Methods' => 'GET, OPTIONS',
         'Access-Control-Allow-Headers' => 'Content-Type, Authorization, X-Requested-With',
         'Access-Control-Allow-Credentials' => 'true',
