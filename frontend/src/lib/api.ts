@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { getSession } from 'next-auth/react'
 import { MasteringSettings } from '@/components/MasteringOptions'
+import { createFileObject } from './fileUtils'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://your-domain.com/api'
 
@@ -57,23 +58,75 @@ async function getAuthHeader() {
 
 export const audioApi = {
   // Upload audio file
-  uploadAudio: async (file: File) => {
-    const formData = new FormData()
-    formData.append('audio', file)
-    const authHeader = await getAuthHeader()
-    const response = await apiClient.post('/audio/upload', formData, {
-      headers: {
-        ...authHeader,
-        // Remove Content-Type header - let axios set it automatically for FormData
-      },
-      onUploadProgress: (progressEvent) => {
-        const percentCompleted = Math.round(
-          (progressEvent.loaded * 100) / (progressEvent.total || 1)
-        )
-        console.log('Upload progress:', percentCompleted)
-      },
-    })
-    return response.data
+  uploadAudio: async (file: File | any) => {
+    let actualFile: File
+
+    // Handle file path objects (common in Electron or custom file pickers)
+    if (file && typeof file === 'object' && file.path && !(file instanceof File)) {
+      console.log('File path object detected:', file)
+      
+      // For web applications, we need to prompt the user to select the actual file
+      // since we can't read files from paths in the browser
+      return new Promise((resolve, reject) => {
+        const input = document.createElement('input')
+        input.type = 'file'
+        input.accept = 'audio/*'
+        
+        input.onchange = async (e) => {
+          const target = e.target as HTMLInputElement
+          const selectedFile = target.files?.[0]
+          
+          if (selectedFile) {
+            try {
+              const formData = new FormData()
+              formData.append('audio', selectedFile)
+              const authHeader = await getAuthHeader()
+              const response = await apiClient.post('/audio/upload', formData, {
+                headers: {
+                  ...authHeader,
+                },
+                onUploadProgress: (progressEvent) => {
+                  const percentCompleted = Math.round(
+                    (progressEvent.loaded * 100) / (progressEvent.total || 1)
+                  )
+                  console.log('Upload progress:', percentCompleted)
+                },
+              })
+              resolve(response.data)
+            } catch (error) {
+              reject(error)
+            }
+          } else {
+            reject(new Error('No file selected'))
+          }
+        }
+        
+        input.click()
+      })
+    } else if (file instanceof File) {
+      actualFile = file
+    } else {
+      throw new Error('Invalid file object provided')
+    }
+
+    // Handle regular File objects
+    if (actualFile) {
+      const formData = new FormData()
+      formData.append('audio', actualFile)
+      const authHeader = await getAuthHeader()
+      const response = await apiClient.post('/audio/upload', formData, {
+        headers: {
+          ...authHeader,
+        },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / (progressEvent.total || 1)
+          )
+          console.log('Upload progress:', percentCompleted)
+        },
+      })
+      return response.data
+    }
   },
 
   // Get all audio files
