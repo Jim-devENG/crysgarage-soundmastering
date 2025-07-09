@@ -7,9 +7,6 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://your-domain.com/
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
   withCredentials: true, // Important for CORS with credentials
 })
 
@@ -59,6 +56,12 @@ async function getAuthHeader() {
 export const audioApi = {
   // Upload audio file
   uploadAudio: async (file: File | any) => {
+    console.log('uploadAudio called with:', file)
+    console.log('file type:', typeof file)
+    console.log('file instanceof File:', file instanceof File)
+    console.log('file.path:', file?.path)
+    console.log('file.relativePath:', file?.relativePath)
+    
     let actualFile: File
 
     // Handle file path objects (common in Electron or custom file pickers)
@@ -80,9 +83,13 @@ export const audioApi = {
             try {
               const formData = new FormData()
               formData.append('audio', selectedFile)
+              
+              // Get auth header for authenticated upload
               const authHeader = await getAuthHeader()
+              
               const response = await apiClient.post('/audio/upload', formData, {
                 headers: {
+                  'Content-Type': 'multipart/form-data',
                   ...authHeader,
                 },
                 onUploadProgress: (progressEvent) => {
@@ -104,18 +111,25 @@ export const audioApi = {
         input.click()
       })
     } else if (file instanceof File) {
+      console.log('File object detected, proceeding with upload')
       actualFile = file
     } else {
+      console.log('Invalid file object, throwing error')
       throw new Error('Invalid file object provided')
     }
 
     // Handle regular File objects
     if (actualFile) {
+      console.log('Uploading actual file:', actualFile.name, actualFile.size)
       const formData = new FormData()
       formData.append('audio', actualFile)
+      
+      // Get auth header for authenticated upload
       const authHeader = await getAuthHeader()
+      
       const response = await apiClient.post('/audio/upload', formData, {
         headers: {
+          'Content-Type': 'multipart/form-data',
           ...authHeader,
         },
         onUploadProgress: (progressEvent) => {

@@ -15,22 +15,26 @@ class CorsMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Get the origin from the request
         $origin = $request->header('Origin');
-        
-        // Define allowed origins
         $allowedOrigins = [
             'http://localhost:3000',
+            'http://localhost:3001',
+            'http://localhost:3002',
+            'http://localhost:3003',
+            'http://localhost:3004',
+            'http://localhost:3005',
+            'http://127.0.0.1:3000',
+            'http://127.0.0.1:3001',
+            'http://127.0.0.1:3002',
+            'http://127.0.0.1:3003',
+            'http://127.0.0.1:3004',
+            'http://127.0.0.1:3005',
             'http://crysgarage.studio:3000',
-            'https://crysgarage.studio:3000',
+            'http://crysgarage.studio:3001',
             'http://crysgarage.studio',
-            'https://crysgarage.studio'
+            'https://crysgarage.studio',
         ];
-        
-        // Check if origin is allowed
         $allowedOrigin = in_array($origin, $allowedOrigins) ? $origin : 'http://localhost:3000';
-        
-        // Handle preflight requests
         if ($request->getMethod() === 'OPTIONS') {
             return response('', 200)
                 ->header('Access-Control-Allow-Origin', $allowedOrigin)
@@ -38,15 +42,11 @@ class CorsMiddleware
                 ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
                 ->header('Access-Control-Allow-Credentials', 'true');
         }
-
         $response = $next($request);
-
-        // Add CORS headers to all responses
         $response->headers->set('Access-Control-Allow-Origin', $allowedOrigin);
         $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
         $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
         $response->headers->set('Access-Control-Allow-Credentials', 'true');
-
         return $response;
     }
 }

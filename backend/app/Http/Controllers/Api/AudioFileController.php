@@ -123,9 +123,9 @@ class AudioFileController extends Controller
             }
 
             // Step 4: Load configuration
-            $allowedMimeTypes = config('audio.supported_formats.mime_types');
+        $allowedMimeTypes = config('audio.supported_formats.mime_types');
             $allowedExtensions = config('audio.supported_formats.extensions');
-            $maxFileSize = config('audio.file_size.max_upload_size_kb');
+        $maxFileSize = config('audio.file_size.max_upload_size_kb');
             $storageDisk = config('audio.storage.disk', 'public');
 
             Log::info('Configuration loaded', [
@@ -138,15 +138,15 @@ class AudioFileController extends Controller
 
             // Step 5: Validate file
             try {
-                $request->validate([
-                    'audio' => [
-                        'required', 
-                        'file', 
-                        'max:' . $maxFileSize,
+        $request->validate([
+            'audio' => [
+                'required', 
+                'file', 
+                'max:' . $maxFileSize,
                         'mimes:' . implode(',', $allowedExtensions)
-                    ],
-                ]);
-                
+            ],
+        ]);
+
                 Log::info('File validation passed', ['upload_id' => $uploadId]);
             } catch (\Illuminate\Validation\ValidationException $e) {
                 Log::error('Upload failed: Validation error', [
@@ -161,9 +161,9 @@ class AudioFileController extends Controller
             }
 
             // Step 6: Additional MIME type validation
-            $finfo = finfo_open(FILEINFO_MIME_TYPE);
-            $mimeType = finfo_file($finfo, $file->getPathname());
-            finfo_close($finfo);
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mimeType = finfo_file($finfo, $file->getPathname());
+        finfo_close($finfo);
 
             Log::info('MIME type check', [
                 'upload_id' => $uploadId,
@@ -171,18 +171,18 @@ class AudioFileController extends Controller
                 'is_allowed' => in_array($mimeType, $allowedMimeTypes),
             ]);
 
-            if (!in_array($mimeType, $allowedMimeTypes)) {
+        if (!in_array($mimeType, $allowedMimeTypes)) {
                 Log::warning('Upload failed: Invalid MIME type', [
                     'upload_id' => $uploadId,
                     'mime_type' => $mimeType,
                     'allowed_types' => $allowedMimeTypes,
                 ]);
-                return response()->json([
+            return response()->json([
                     'message' => 'Unsupported file type',
                     'error' => 'The uploaded file type is not supported. Please upload a valid audio file.',
                     'detected_type' => $mimeType,
-                ], 422);
-            }
+            ], 422);
+        }
 
             // Step 7: Check storage disk availability
             try {
@@ -214,7 +214,7 @@ class AudioFileController extends Controller
 
             // Step 8: Prepare file storage
             $user = $request->user();
-            $originalFilename = $file->getClientOriginalName();
+        $originalFilename = $file->getClientOriginalName();
             $fileSize = $file->getSize();
             $extension = $file->getClientOriginalExtension();
 
@@ -266,12 +266,12 @@ class AudioFileController extends Controller
 
             // Step 10: Create database record
             try {
-                $audioFile = AudioFile::create([
+        $audioFile = AudioFile::create([
                     'user_id' => $user->id,
-                    'original_filename' => $originalFilename,
+            'original_filename' => $originalFilename,
                     'original_path' => $storedPath,
                     'file_size' => $fileSize,
-                    'mime_type' => $mimeType,
+            'mime_type' => $mimeType,
                     'status' => 'uploaded',
                     'metadata' => [
                         'upload_id' => $uploadId,
@@ -287,11 +287,11 @@ class AudioFileController extends Controller
                     'database_record' => $audioFile->toArray(),
                 ]);
                 
-            } catch (\Exception $e) {
+        } catch (\Exception $e) {
                 Log::error('Upload failed: Database error', [
                     'upload_id' => $uploadId,
                     'stored_path' => $storedPath,
-                    'error' => $e->getMessage(),
+                'error' => $e->getMessage(),
                     'trace' => $e->getTraceAsString(),
                 ]);
                 
@@ -316,7 +316,7 @@ class AudioFileController extends Controller
             try {
                 Log::info('Dispatching processing job', [
                     'upload_id' => $uploadId,
-                    'audio_file_id' => $audioFile->id,
+                'audio_file_id' => $audioFile->id,
                     'queue_connection' => config('queue.default'),
                     'queue_name' => config('queue.connections.' . config('queue.default') . '.queue'),
                 ]);
@@ -337,17 +337,17 @@ class AudioFileController extends Controller
                 ]);
                 
                 // Update status to failed but keep the record
-                $audioFile->update([
-                    'status' => 'failed',
+            $audioFile->update([
+                'status' => 'failed',
                     'error_message' => 'Failed to dispatch processing job: ' . $e->getMessage(),
-                ]);
-                
-                return response()->json([
+            ]);
+
+            return response()->json([
                     'message' => 'Processing failed',
                     'error' => 'File uploaded but processing could not be started. Please try again.',
                     'audio_file_id' => $audioFile->id,
-                ], 500);
-            }
+            ], 500);
+        }
 
             $uploadTime = microtime(true) - $uploadStartTime;
             
@@ -358,9 +358,9 @@ class AudioFileController extends Controller
                 'file_size_mb' => round($fileSize / 1024 / 1024, 2),
             ]);
 
-            return response()->json([
+        return response()->json([
                 'message' => 'Audio file uploaded successfully',
-                'data' => $audioFile,
+            'data' => $audioFile,
                 'upload_id' => $uploadId,
                 'processing_status' => 'queued',
             ], 201);
@@ -780,10 +780,10 @@ class AudioFileController extends Controller
                 'mastering_metadata' => $audioFile->mastering_metadata,
             ]
         ]);
-        // Add CORS headers for debugging
-        $response->headers->set('Access-Control-Allow-Origin', '*');
-        $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-        $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        // Add CORS headers for debugging (only if not handled by global middleware)
+        // $response->headers->set('Access-Control-Allow-Origin', $request->header('Origin', 'http://localhost:3000'));
+        // $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        // $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
         Log::info('getStatus response', ['audio_file_id' => $audioFile->id, 'response' => $response->getContent()]);
         return $response;
     }

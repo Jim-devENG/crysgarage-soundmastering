@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\AudioFileController as ApiAudioFileController;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
 use App\Http\Controllers\ChunkedUploadController;
+use Illuminate\Support\Facades\Log;
 
 // Public routes
 Route::post('/register', [AuthController::class, 'register'])->name('register');
@@ -43,7 +44,7 @@ Route::get('/test-download/{path}', function ($path) {
         'Content-Type' => $mimeType,
         'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         'Content-Length' => filesize($fullPath),
-        'Access-Control-Allow-Origin' => 'http://crysgarage.studio:3000',
+        'Access-Control-Allow-Origin' => request()->header('Origin', 'http://localhost:3000'),
         'Access-Control-Allow-Methods' => 'GET, OPTIONS',
         'Access-Control-Allow-Headers' => 'Content-Type, Authorization, X-Requested-With',
         'Access-Control-Allow-Credentials' => 'true',
@@ -62,7 +63,7 @@ Route::get('/storage/{path}', function ($path) {
     
     return response()->file($fullPath, [
         'Content-Type' => $mimeType,
-        'Access-Control-Allow-Origin' => 'http://crysgarage.studio:3000',
+        'Access-Control-Allow-Origin' => request()->header('Origin', 'http://localhost:3000'),
         'Access-Control-Allow-Methods' => 'GET, OPTIONS',
         'Access-Control-Allow-Headers' => 'Content-Type, Authorization, X-Requested-With',
         'Access-Control-Allow-Credentials' => 'true',
@@ -89,6 +90,79 @@ Route::get('/test-upload-config', function () {
             'request_method' => $_SERVER['REQUEST_METHOD'] ?? 'not set',
         ]
     ]);
+});
+
+// Public test upload route (no authentication required)
+Route::post('/test-upload', function (Request $request) {
+    Log::info('=== TEST UPLOAD START ===', [
+        'request_method' => $request->method(),
+        'content_type' => $request->header('Content-Type'),
+        'content_length' => $request->header('Content-Length'),
+        'has_file_audio' => $request->hasFile('audio'),
+        'all_files' => $request->allFiles(),
+        'post_data' => $request->post(),
+        'user_agent' => $request->header('User-Agent'),
+    ]);
+
+    try {
+        if (!$request->hasFile('audio')) {
+            Log::error('Test upload failed: No file provided', [
+                'files' => $request->allFiles(),
+                'post_data' => $request->post(),
+            ]);
+            return response()->json([
+                'error' => 'No file provided',
+                'files' => $request->allFiles(),
+                'post_data' => $request->post(),
+            ], 400);
+        }
+
+        $file = $request->file('audio');
+        
+        Log::info('Test upload: File received', [
+            'original_name' => $file->getClientOriginalName(),
+            'size' => $file->getSize(),
+            'mime_type' => $file->getMimeType(),
+            'extension' => $file->getClientOriginalExtension(),
+            'is_valid' => $file->isValid(),
+            'error' => $file->getError(),
+        ]);
+        
+        if (!$file->isValid()) {
+            Log::error('Test upload failed: Invalid file', [
+                'file_error' => $file->getError(),
+            ]);
+            return response()->json([
+                'error' => 'Invalid file',
+                'file_error' => $file->getError(),
+            ], 400);
+        }
+
+        Log::info('Test upload: Success', [
+            'file_name' => $file->getClientOriginalName(),
+            'file_size' => $file->getSize(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'File received successfully',
+            'file_info' => [
+                'original_name' => $file->getClientOriginalName(),
+                'size' => $file->getSize(),
+                'mime_type' => $file->getMimeType(),
+                'extension' => $file->getClientOriginalExtension(),
+            ]
+        ]);
+    } catch (\Exception $e) {
+        Log::error('Test upload failed: Exception', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+        return response()->json([
+            'error' => 'Upload failed',
+            'message' => $e->getMessage(),
+        ], 500);
+    }
 });
 
 // Protected routes

@@ -4,75 +4,76 @@ import { useState } from 'react'
 import { audioApi } from '@/lib/api'
 
 export default function TestUpload() {
-  const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [result, setResult] = useState<string>('')
+  const [error, setError] = useState<string>('')
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0]
-    if (selectedFile) {
-      setFile(selectedFile)
-      console.log('File selected:', selectedFile)
-      console.log('File type:', selectedFile.type)
-      console.log('File size:', selectedFile.size)
-    }
-  }
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
 
-  const handleUpload = async () => {
-    if (!file) {
-      setResult('No file selected')
-      return
-    }
+    console.log('TestUpload: File selected:', file)
+    console.log('TestUpload: File type:', typeof file)
+    console.log('TestUpload: File instanceof File:', file instanceof File)
+    console.log('TestUpload: File name:', file.name)
+    console.log('TestUpload: File size:', file.size)
 
     setUploading(true)
+    setError('')
     setResult('')
 
     try {
-      console.log('Uploading file:', file)
+      console.log('Testing upload with file:', file.name, 'Size:', file.size)
+      
       const response = await audioApi.uploadAudio(file)
+      
       console.log('Upload response:', response)
-      setResult(`Success: ${JSON.stringify(response, null, 2)}`)
-    } catch (error: any) {
-      console.error('Upload error:', error)
-      setResult(`Error: ${error.message || 'Upload failed'}`)
+      setResult(JSON.stringify(response, null, 2))
+    } catch (err: any) {
+      console.error('Upload error:', err)
+      setError(err.message || 'Upload failed')
     } finally {
       setUploading(false)
     }
   }
 
   return (
-    <div className="p-4 border rounded">
-      <h2 className="text-lg font-bold mb-4">Test Upload</h2>
+    <div className="p-6 max-w-2xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Upload Test</h1>
+      
+      <div className="mb-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+        <p className="text-blue-400 text-sm">
+          <strong>Note:</strong> This is using the public test upload route (no authentication required) for demonstration purposes.
+          In production, you would use the authenticated upload route.
+        </p>
+      </div>
       
       <div className="mb-4">
         <input
           type="file"
           accept="audio/*"
-          onChange={handleFileChange}
+          onChange={handleFileSelect}
+          disabled={uploading}
           className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700"
         />
       </div>
 
-      {file && (
-        <div className="mb-4 p-2 bg-gray-800 rounded">
-          <p><strong>Selected File:</strong></p>
-          <p>Name: {file.name}</p>
-          <p>Type: {file.type}</p>
-          <p>Size: {file.size} bytes</p>
+      {uploading && (
+        <div className="mb-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+          <p className="text-blue-400">Uploading...</p>
         </div>
       )}
 
-      <button
-        onClick={handleUpload}
-        disabled={!file || uploading}
-        className="px-4 py-2 bg-purple-600 text-white rounded disabled:opacity-50"
-      >
-        {uploading ? 'Uploading...' : 'Upload'}
-      </button>
+      {error && (
+        <div className="mb-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+          <p className="text-red-400">Error: {error}</p>
+        </div>
+      )}
 
       {result && (
-        <div className="mt-4 p-2 bg-gray-800 rounded">
-          <pre className="text-sm">{result}</pre>
+        <div className="mb-4 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+          <h3 className="text-green-400 font-semibold mb-2">Upload Result:</h3>
+          <pre className="text-sm text-green-300 overflow-auto">{result}</pre>
         </div>
       )}
     </div>

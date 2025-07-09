@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Upload Test</title>
+  </head>
+  <body>
+    <h1>Audio Upload Test</h1>
+    <input type="file" id="audioFile" accept="audio/*" />
+    <button onclick="testUpload()">Test Upload</button>
+    <div id="result"></div>
+
+    <script>
+      async function testUpload() {
+        const fileInput = document.getElementById("audioFile");
+        const resultDiv = document.getElementById("result");
+
+        if (!fileInput.files[0]) {
+          resultDiv.innerHTML =
+            '<p style="color: red;">Please select a file first</p>';
+          return;
+        }
+
+        const file = fileInput.files[0];
+        const formData = new FormData();
+        formData.append("audio", file);
+
+        try {
+          resultDiv.innerHTML = "<p>Uploading...</p>";
+
+          const response = await fetch(
+            "http://localhost:8000/api/audio/upload",
+            {
+              method: "POST",
+              body: formData,
+              headers: {
+                // Don't set Content-Type for FormData, let browser set it
+              },
+            }
+          );
+
+          const result = await response.text();
+
+          resultDiv.innerHTML = `
+                    <h3>Response:</h3>
+                    <p><strong>Status:</strong> ${response.status}</p>
+                    <p><strong>Status Text:</strong> ${response.statusText}</p>
+                    <pre>${result}</pre>
+                `;
+        } catch (error) {
+          resultDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+        }
+      }
+    </script>
+  </body>
+</html>
