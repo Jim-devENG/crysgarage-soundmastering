@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
-import TestUpload from '@/components/TestUpload'
 
 export default function Home() {
   const [mounted, setMounted] = useState(false)
@@ -38,9 +37,42 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* Test Upload Section */}
-      <div className="flex-1 p-8">
-        <TestUpload />
+      {/* Main Content */}
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="text-center">
+          <h1 className="text-5xl font-bold text-white mb-6">
+            Professional Audio Mastering
+          </h1>
+          <p className="text-xl text-gray-300 mb-8 max-w-2xl">
+            Transform your music with AI-powered mastering technology. 
+            Get professional-quality results in minutes.
+          </p>
+          <div className="space-x-4">
+            {session ? (
+              <Link 
+                href="/mastering" 
+                className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-lg font-semibold transition"
+              >
+                Start Mastering
+              </Link>
+            ) : (
+              <>
+                <Link 
+                  href="/signup" 
+                  className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-lg font-semibold transition"
+                >
+                  Get Started
+                </Link>
+                <Link 
+                  href="/pricing" 
+                  className="border border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-gray-900 transition"
+                >
+                  View Pricing
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Footer */}
