@@ -142,6 +142,11 @@ Route::middleware('auth:sanctum')->group(function () {
         // Upload audio file
         Route::post('/upload', [ApiAudioFileController::class, 'upload']);
         
+        // Tier-specific mastering endpoints
+        Route::post('/upload/free', [ApiAudioFileController::class, 'uploadFree']);
+        Route::post('/upload/automatic', [ApiAudioFileController::class, 'uploadAutomatic']);
+        Route::post('/upload/advanced', [ApiAudioFileController::class, 'uploadAdvanced']);
+        
         // Advanced mastering
         Route::post('/{audioFile}/mastering', [ApiAudioFileController::class, 'applyAdvancedMastering']);
         

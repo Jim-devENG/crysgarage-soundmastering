@@ -1,45 +1,100 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Slider } from '@/components/ui/slider'
-import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
-import { Sparkles, Music, Settings, Download, Play, Pause, Upload } from 'lucide-react'
-import AudioUploader from '@/components/AudioUploader'
-import AudioPlayer from '@/components/AudioPlayer'
+import { 
+  Sparkles, 
+  Music, 
+  Play, 
+  Upload, 
+  Download, 
+  Star, 
+  Zap,
+  Crown,
+  Headphones,
+  Mic,
+  Video,
+  Lock,
+  Check,
+  X
+} from 'lucide-react'
 
 export default function MasteringPage() {
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
-  const [processedFile, setProcessedFile] = useState<string | null>(null)
-
-  const masteringPresets = [
-    { name: 'Pop', description: 'Bright, punchy sound with enhanced vocals', icon: '🎵' },
-    { name: 'Rock', description: 'Aggressive, powerful sound with heavy bass', icon: '🤘' },
-    { name: 'Jazz', description: 'Warm, smooth sound with natural dynamics', icon: '🎷' },
-    { name: 'Electronic', description: 'Clean, modern sound with tight bass', icon: '🎛️' },
-    { name: 'Classical', description: 'Natural, spacious sound with clarity', icon: '🎻' },
-    { name: 'Hip Hop', description: 'Bass-heavy with crisp highs', icon: '🎤' },
+  const masteringTiers = [
+    {
+      name: "Free Automatic",
+      description: "Perfect for trying out our mastering service",
+      features: [
+        "Basic mastering processing",
+        "MP3 download format",
+        "Standard quality output",
+        "1 track per session",
+        "24-hour processing time"
+      ],
+      limitations: [
+        "No custom settings",
+        "Limited to 5MB file size",
+        "No WAV/FLAC export",
+        "No batch processing"
+      ],
+      icon: Music,
+      color: "bg-blue-600",
+      badge: "Free",
+      link: "/mastering/free-automatic",
+      popular: false
+    },
+    {
+      name: "Automatic",
+      description: "Professional mastering with smart presets",
+      features: [
+        "Advanced mastering algorithms",
+        "Multiple format exports (WAV, MP3, FLAC)",
+        "Genre-specific presets",
+        "Up to 50MB file size",
+        "2-hour processing time",
+        "Custom EQ adjustments",
+        "Stereo enhancement"
+      ],
+      limitations: [
+        "Limited custom settings",
+        "No batch processing",
+        "Standard support"
+      ],
+      icon: Sparkles,
+      color: "bg-green-600",
+      badge: "Popular",
+      link: "/mastering/automatic",
+      popular: true
+    },
+    {
+      name: "Advanced",
+      description: "Full control with professional tools",
+      features: [
+        "Complete mastering suite",
+        "Unlimited file sizes",
+        "Real-time processing",
+        "Batch processing (up to 10 files)",
+        "Custom mastering profiles",
+        "Advanced EQ and compression",
+        "Multi-band processing",
+        "Reference track comparison",
+        "Priority support"
+      ],
+      limitations: [
+        "Requires mastering knowledge",
+        "Higher learning curve"
+      ],
+      icon: Crown,
+      color: "bg-purple-600",
+      badge: "Pro",
+      link: "/mastering/advanced",
+      popular: false
+    }
   ]
-
-  const handleFileUpload = (file: File) => {
-    setUploadedFile(file)
-    setProcessedFile(null)
-  }
-
-  const handleMastering = async () => {
-    if (!uploadedFile) return
-    
-    setIsProcessing(true)
-    // Simulate processing time
-    setTimeout(() => {
-      setIsProcessing(false)
-      setProcessedFile('/api/placeholder-processed-audio')
-    }, 3000)
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
@@ -47,208 +102,169 @@ export default function MasteringPage() {
         <div className="text-center mb-12">
           <div className="flex items-center justify-center mb-4">
             <Sparkles className="text-red-400 w-8 h-8 mr-3" />
-            <h1 className="text-4xl font-bold text-white">AI Mastering Studio</h1>
+            <h1 className="text-4xl font-bold text-white">Choose Your Mastering Studio</h1>
           </div>
           <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-            Professional-grade AI mastering with advanced algorithms and customizable presets
+            Select the perfect mastering tier for your needs. From free trials to professional tools.
           </p>
         </div>
 
-        <Tabs defaultValue="upload" className="space-y-8">
-          <TabsList className="grid w-full grid-cols-3 bg-gray-800">
-            <TabsTrigger value="upload" className="data-[state=active]:bg-red-600">
-              <Upload className="w-4 h-4 mr-2" />
-              Upload & Process
-            </TabsTrigger>
-            <TabsTrigger value="presets" className="data-[state=active]:bg-red-600">
-              <Music className="w-4 h-4 mr-2" />
-              Mastering Presets
-            </TabsTrigger>
-            <TabsTrigger value="advanced" className="data-[state=active]:bg-red-600">
-              <Settings className="w-4 h-4 mr-2" />
-              Advanced Settings
-            </TabsTrigger>
-          </TabsList>
+        <div className="grid md:grid-cols-3 gap-8 mb-12">
+          {masteringTiers.map((tier, index) => (
+            <Card 
+              key={index} 
+              className={`relative bg-gray-800/50 border-gray-700 transition-all duration-300 hover:shadow-lg ${
+                tier.popular 
+                  ? 'border-green-500/50 shadow-lg shadow-green-500/20 scale-105' 
+                  : 'hover:border-red-500/30'
+              }`}
+            >
+              {tier.popular && (
+                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                  <Badge className="bg-green-600 text-white px-4 py-1">
+                    <Star className="w-3 h-3 mr-1" />
+                    {tier.badge}
+                  </Badge>
+                </div>
+              )}
 
-          <TabsContent value="upload" className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-8">
-              <Card className="bg-gray-800/50 border-gray-700">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center">
-                    <Upload className="w-5 h-5 mr-2" />
-                    Upload Your Audio
-                  </CardTitle>
-                  <CardDescription className="text-gray-400">
-                    Upload your WAV, MP3, or FLAC file for AI mastering
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <AudioUploader onFileUpload={handleFileUpload} />
-                  {uploadedFile && (
-                    <div className="mt-4 p-4 bg-gray-700/50 rounded-lg">
-                      <p className="text-white font-medium">{uploadedFile.name}</p>
-                      <p className="text-gray-400 text-sm">
-                        {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="bg-gray-800/50 border-gray-700">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center">
-                    <Sparkles className="w-5 h-5 mr-2" />
-                    Mastering Options
-                  </CardTitle>
-                  <CardDescription className="text-gray-400">
-                    Choose your mastering approach
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-white text-sm font-medium">Target Loudness</label>
-                    <Slider defaultValue={[14]} max={20} min={8} step={0.1} />
-                    <p className="text-gray-400 text-xs">-14 LUFS (Industry Standard)</p>
+              <CardHeader className="text-center">
+                <div className="flex justify-center mb-4">
+                  <div className={`w-16 h-16 ${tier.color} rounded-lg flex items-center justify-center`}>
+                    <tier.icon className="w-8 h-8 text-white" />
                   </div>
-                  
-                  <div className="space-y-2">
-                    <label className="text-white text-sm font-medium">Stereo Width</label>
-                    <Slider defaultValue={[50]} max={100} min={0} step={1} />
-                    <p className="text-gray-400 text-xs">50% (Balanced)</p>
-                  </div>
+                </div>
+                <CardTitle className="text-white text-2xl">{tier.name}</CardTitle>
+                <CardDescription className="text-gray-400">
+                  {tier.description}
+                </CardDescription>
+              </CardHeader>
 
-                  <div className="flex items-center justify-between">
-                    <span className="text-white text-sm">Enhance Clarity</span>
-                    <Switch />
-                  </div>
+              <CardContent className="space-y-6">
+                <div className="space-y-3">
+                  <h4 className="text-white font-semibold flex items-center">
+                    <Check className="w-4 h-4 mr-2 text-green-400" />
+                    What's Included
+                  </h4>
+                  <ul className="space-y-2">
+                    {tier.features.map((feature, featureIndex) => (
+                      <li key={featureIndex} className="flex items-center text-gray-300 text-sm">
+                        <Check className="w-4 h-4 mr-2 text-green-400 flex-shrink-0" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
 
-                  <div className="flex items-center justify-between">
-                    <span className="text-white text-sm">Reduce Noise</span>
-                    <Switch />
+                {tier.limitations.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-white font-semibold flex items-center">
+                      <X className="w-4 h-4 mr-2 text-red-400" />
+                      Limitations
+                    </h4>
+                    <ul className="space-y-2">
+                      {tier.limitations.map((limitation, limitationIndex) => (
+                        <li key={limitationIndex} className="flex items-center text-gray-400 text-sm">
+                          <X className="w-4 h-4 mr-2 text-red-400 flex-shrink-0" />
+                          {limitation}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
+                )}
 
+                <Link href={tier.link}>
                   <Button 
-                    onClick={handleMastering}
-                    disabled={!uploadedFile || isProcessing}
-                    className="w-full bg-red-600 hover:bg-red-700"
+                    className={`w-full ${
+                      tier.popular 
+                        ? 'bg-green-600 hover:bg-green-700' 
+                        : 'bg-red-600 hover:bg-red-700'
+                    } text-white`}
                   >
-                    {isProcessing ? (
+                    {tier.name === "Free Automatic" ? (
                       <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                        Processing...
+                        <Play className="w-4 h-4 mr-2" />
+                        Start Free
+                      </>
+                    ) : tier.popular ? (
+                      <>
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Choose {tier.name}
                       </>
                     ) : (
                       <>
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        Start Mastering
+                        <Crown className="w-4 h-4 mr-2" />
+                        Choose {tier.name}
                       </>
                     )}
                   </Button>
-                </CardContent>
-              </Card>
-            </div>
-
-            {processedFile && (
-              <Card className="bg-gray-800/50 border-gray-700">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center">
-                    <Download className="w-5 h-5 mr-2" />
-                    Mastered Audio
-                  </CardTitle>
-                  <CardDescription className="text-gray-400">
-                    Your professionally mastered track
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <AudioPlayer audioUrl={processedFile} />
-                  <div className="flex gap-2 mt-4">
-                    <Button className="bg-green-600 hover:bg-green-700">
-                      <Download className="w-4 h-4 mr-2" />
-                      Download WAV
-                    </Button>
-                    <Button variant="outline" className="border-gray-600 text-gray-300">
-                      <Download className="w-4 h-4 mr-2" />
-                      Download MP3
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          <TabsContent value="presets" className="space-y-6">
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {masteringPresets.map((preset) => (
-                <Card key={preset.name} className="bg-gray-800/50 border-gray-700 hover:border-red-500/50 transition-colors cursor-pointer">
-                  <CardHeader>
-                    <CardTitle className="text-white flex items-center">
-                      <span className="text-2xl mr-3">{preset.icon}</span>
-                      {preset.name}
-                    </CardTitle>
-                    <CardDescription className="text-gray-400">
-                      {preset.description}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex gap-2">
-                      <Badge variant="secondary" className="bg-gray-700 text-gray-300">
-                        Optimized
-                      </Badge>
-                      <Badge variant="outline" className="border-red-500 text-red-400">
-                        AI Enhanced
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="advanced" className="space-y-6">
-            <Card className="bg-gray-800/50 border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-white">Advanced Mastering Parameters</CardTitle>
-                <CardDescription className="text-gray-400">
-                  Fine-tune your mastering settings for professional results
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-white text-sm font-medium">Compression Ratio</label>
-                      <Slider defaultValue={[2]} max={10} min={1} step={0.1} />
-                    </div>
-                    <div>
-                      <label className="text-white text-sm font-medium">Attack Time</label>
-                      <Slider defaultValue={[10]} max={50} min={1} step={1} />
-                    </div>
-                    <div>
-                      <label className="text-white text-sm font-medium">Release Time</label>
-                      <Slider defaultValue={[100]} max={500} min={10} step={10} />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-white text-sm font-medium">EQ Low Shelf</label>
-                      <Slider defaultValue={[0]} max={10} min={-10} step={0.5} />
-                    </div>
-                    <div>
-                      <label className="text-white text-sm font-medium">EQ High Shelf</label>
-                      <Slider defaultValue={[0]} max={10} min={-10} step={0.5} />
-                    </div>
-                    <div>
-                      <label className="text-white text-sm font-medium">Limiter Threshold</label>
-                      <Slider defaultValue={[-1]} max={0} min={-10} step={0.1} />
-                    </div>
-                  </div>
-                </div>
+                </Link>
               </CardContent>
             </Card>
-          </TabsContent>
-        </Tabs>
+          ))}
+        </div>
+
+        {/* Comparison Table */}
+        <Card className="bg-gray-800/50 border-gray-700">
+          <CardHeader>
+            <CardTitle className="text-white text-2xl text-center">Feature Comparison</CardTitle>
+            <CardDescription className="text-gray-400 text-center">
+              Compare what each tier offers
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-700">
+                    <th className="text-left text-white font-semibold py-3">Feature</th>
+                    <th className="text-center text-blue-400 font-semibold py-3">Free Automatic</th>
+                    <th className="text-center text-green-400 font-semibold py-3">Automatic</th>
+                    <th className="text-center text-purple-400 font-semibold py-3">Advanced</th>
+                  </tr>
+                </thead>
+                <tbody className="space-y-2">
+                  <tr className="border-b border-gray-700">
+                    <td className="text-gray-300 py-3">File Size Limit</td>
+                    <td className="text-center text-gray-400">5MB</td>
+                    <td className="text-center text-gray-400">50MB</td>
+                    <td className="text-center text-gray-400">Unlimited</td>
+                  </tr>
+                  <tr className="border-b border-gray-700">
+                    <td className="text-gray-300 py-3">Export Formats</td>
+                    <td className="text-center text-gray-400">MP3 only</td>
+                    <td className="text-center text-gray-400">WAV, MP3, FLAC</td>
+                    <td className="text-center text-gray-400">All formats</td>
+                  </tr>
+                  <tr className="border-b border-gray-700">
+                    <td className="text-gray-300 py-3">Processing Time</td>
+                    <td className="text-center text-gray-400">24 hours</td>
+                    <td className="text-center text-gray-400">2 hours</td>
+                    <td className="text-center text-gray-400">Real-time</td>
+                  </tr>
+                  <tr className="border-b border-gray-700">
+                    <td className="text-gray-300 py-3">Custom Settings</td>
+                    <td className="text-center text-red-400">✗</td>
+                    <td className="text-center text-green-400">✓</td>
+                    <td className="text-center text-green-400">✓</td>
+                  </tr>
+                  <tr className="border-b border-gray-700">
+                    <td className="text-gray-300 py-3">Batch Processing</td>
+                    <td className="text-center text-red-400">✗</td>
+                    <td className="text-center text-red-400">✗</td>
+                    <td className="text-center text-green-400">✓</td>
+                  </tr>
+                  <tr className="border-b border-gray-700">
+                    <td className="text-gray-300 py-3">Support</td>
+                    <td className="text-center text-gray-400">Community</td>
+                    <td className="text-center text-gray-400">Email</td>
+                    <td className="text-center text-gray-400">Priority</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
