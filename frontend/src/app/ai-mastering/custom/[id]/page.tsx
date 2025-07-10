@@ -60,7 +60,7 @@ export default function CustomMasteringPage() {
           <h1 className="text-2xl font-bold text-white mb-2">Error</h1>
           <p className="text-gray-400 mb-4">{error || 'Audio file not found'}</p>
           <a href="/ai-mastering" className="text-red-400 hover:text-red-300">
-            Back to AI Mastering
+            Back to Sound Mastering
           </a>
         </div>
       </div>

@@ -11,7 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // mp3_path already exists from the initial migration. No action needed.
+        Schema::table('audio_files', function (Blueprint $table) {
+            $table->unsignedBigInteger('user_id')->nullable()->change();
+        });
     }
 
     /**
@@ -19,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // mp3_path already exists from the initial migration. No action needed.
+        Schema::table('audio_files', function (Blueprint $table) {
+            $table->unsignedBigInteger('user_id')->nullable(false)->change();
+        });
     }
 };

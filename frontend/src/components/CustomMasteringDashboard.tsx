@@ -78,6 +78,8 @@ interface LocalSettings {
   boost_enabled: boolean;
   stereo_width_enabled: boolean;
   target_loudness_enabled: boolean;
+  high_freq_enhancement: boolean;
+  low_freq_enhancement: boolean;
 }
 
 function toMasteringSettings(local: LocalSettings) {
@@ -97,8 +99,8 @@ function toMasteringSettings(local: LocalSettings) {
     
     // Advanced Settings
     dynamic_range: local.dynamic_range,
-    high_freq_enhancement: true,
-    low_freq_enhancement: true,
+    high_freq_enhancement: local.high_freq_enhancement,
+    low_freq_enhancement: local.low_freq_enhancement,
     noise_reduction: local.noise_reduction ?? false
   }
 }
@@ -221,7 +223,9 @@ export default function CustomMasteringDashboard({ audioFile }: CustomMasteringD
     presence_boost: 2,
     boost_enabled: false,
     stereo_width_enabled: false,
-    target_loudness_enabled: false
+    target_loudness_enabled: false,
+    high_freq_enhancement: true,
+    low_freq_enhancement: true,
   })
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
@@ -235,6 +239,13 @@ export default function CustomMasteringDashboard({ audioFile }: CustomMasteringD
   const [masteredAudioUrl, setMasteredAudioUrl] = useState<string>('')
   const [realTimeStatus, setRealTimeStatus] = useState<string>('')
   const [lastProcessedSettings, setLastProcessedSettings] = useState<string>('') // Cache for processed settings
+  
+  // Update settings function
+  const updateSettings = (newSettings: Partial<LocalSettings>) => {
+    const updatedSettings = { ...settings, ...newSettings }
+    setSettings(updatedSettings)
+    applyRealTimeEffects(updatedSettings)
+  }
   
   // Web Audio API for real-time processing
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null)
@@ -1463,6 +1474,157 @@ export default function CustomMasteringDashboard({ audioFile }: CustomMasteringD
                       <input {...getReferenceInputProps()} />
                       <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
                       <p className="text-sm text-gray-400">{referenceAudio ? referenceAudio.name : 'Drop reference audio here or click to select'}</p>
+                    </div>
+                  )}
+                </div>
+                {/* Genre and Quality Settings */}
+                <div className="space-y-4">
+                  <CardTitle className="text-white">Genre & Quality</CardTitle>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-white">Genre Preset</Label>
+                      <Select
+                        value={settings.genre_preset}
+                        onValueChange={(value) => updateSettings({ genre_preset: value })}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {GENRE_PRESETS.map((preset) => (
+                            <SelectItem key={preset.value} value={preset.value}>
+                              {preset.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-white">Processing Quality</Label>
+                      <Select
+                        value={settings.processing_quality}
+                        onValueChange={(value: 'fast' | 'standard' | 'high') => updateSettings({ processing_quality: value })}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="fast">Fast</SelectItem>
+                          <SelectItem value="standard">Standard</SelectItem>
+                          <SelectItem value="high">High Quality</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Dynamic Range Control */}
+                <div className="space-y-4">
+                  <CardTitle className="text-white">Dynamic Range</CardTitle>
+                  <div className="space-y-2">
+                    <Label className="text-white">Dynamic Range Control</Label>
+                    <Select
+                      value={settings.dynamic_range}
+                      onValueChange={(value: 'compressed' | 'natural' | 'expanded') => updateSettings({ dynamic_range: value })}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="compressed">Compressed</SelectItem>
+                        <SelectItem value="natural">Natural</SelectItem>
+                        <SelectItem value="expanded">Expanded</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Enhancement Controls */}
+                <div className="space-y-4">
+                  <CardTitle className="text-white">Enhancement Controls</CardTitle>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-white">High Frequency Enhancement</Label>
+                        <Switch
+                          checked={settings.high_freq_enhancement ?? true}
+                          onCheckedChange={(checked) => updateSettings({ high_freq_enhancement: checked })}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-white">Low Frequency Enhancement</Label>
+                        <Switch
+                          checked={settings.low_freq_enhancement ?? true}
+                          onCheckedChange={(checked) => updateSettings({ low_freq_enhancement: checked })}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-white">Noise Reduction</Label>
+                        <Switch
+                          checked={settings.noise_reduction}
+                          onCheckedChange={(checked) => updateSettings({ noise_reduction: checked })}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-white">Auto Mastering</Label>
+                        <Switch
+                          checked={settings.auto_mastering_enabled}
+                          onCheckedChange={(checked) => updateSettings({ auto_mastering_enabled: checked })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Boost Controls */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-white">Boost Enhancement</CardTitle>
+                    <Switch
+                      checked={settings.boost_enabled}
+                      onCheckedChange={(checked) => updateSettings({ boost_enabled: checked })}
+                    />
+                  </div>
+                  {settings.boost_enabled && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-white">Bass Boost: {settings.bass_boost} dB</Label>
+                        <Slider
+                          value={[settings.bass_boost]}
+                          onValueChange={([value]) => updateSettings({ bass_boost: value })}
+                          min={-3}
+                          max={6}
+                          step={0.5}
+                          className="w-full"
+                        />
+                        <div className="flex justify-between text-sm text-gray-400">
+                          <span>-3 dB</span>
+                          <span className="text-white font-medium">{settings.bass_boost} dB</span>
+                          <span>+6 dB</span>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-white">Presence Boost: {settings.presence_boost} dB</Label>
+                        <Slider
+                          value={[settings.presence_boost]}
+                          onValueChange={([value]) => updateSettings({ presence_boost: value })}
+                          min={-3}
+                          max={6}
+                          step={0.5}
+                          className="w-full"
+                        />
+                        <div className="flex justify-between text-sm text-gray-400">
+                          <span>-3 dB</span>
+                          <span className="text-white font-medium">{settings.presence_boost} dB</span>
+                          <span>+6 dB</span>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

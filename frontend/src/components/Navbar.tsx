@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useSession, signOut } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
-import { Sparkles, Music, LogOut, User } from 'lucide-react'
+import { Sparkles, Music, LogOut, User, BookOpen, DollarSign } from 'lucide-react'
 
 export default function Navbar() {
   const { data: session } = useSession()
@@ -18,9 +18,17 @@ export default function Navbar() {
           </Link>
 
           <div className="hidden md:flex items-center space-x-8">
-            <Link href="/ai-mastering" className="text-gray-300 hover:text-white transition flex items-center gap-2">
+            <Link href="/mastering" className="text-gray-300 hover:text-white transition flex items-center gap-2">
               <Music className="w-4 h-4" />
-              AI Mastering
+              Mastering
+            </Link>
+            <Link href="/courses" className="text-gray-300 hover:text-white transition flex items-center gap-2">
+              <BookOpen className="w-4 h-4" />
+              Courses
+            </Link>
+            <Link href="/pricing" className="text-gray-300 hover:text-white transition flex items-center gap-2">
+              <DollarSign className="w-4 h-4" />
+              Pricing
             </Link>
           </div>
 

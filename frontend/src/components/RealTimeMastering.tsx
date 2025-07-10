@@ -108,8 +108,9 @@ export default function RealTimeMastering({
   return (
     <div className="space-y-6">
       <AudioComparison
-        originalUrl={originalUrl}
-        masteredUrl={masteredUrl}
+        originalPath={originalUrl}
+        masteredPath={masteredUrl}
+        masteringType="advanced"
       />
 
       <Card>

@@ -422,7 +422,7 @@ export default function AIMasteringPage() {
               <Zap className="w-8 h-8 md:w-10 md:h-10 text-white" />
             </div>
             <h1 className="text-3xl md:text-5xl font-bold text-white mb-3 md:mb-4 bg-gradient-to-r from-red-400 via-purple-400 to-blue-400 bg-clip-text text-transparent">
-              AI Mastering Studio
+              Sound Mastering Studio
             </h1>
             <p className="text-gray-300 text-lg md:text-xl max-w-2xl mx-auto px-4">
               Transform your music with professional AI-powered mastering. Choose your genre and let our AI create the perfect master.

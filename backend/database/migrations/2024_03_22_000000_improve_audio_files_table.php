@@ -9,16 +9,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('audio_files', function (Blueprint $table) {
-            // Add new columns
-            $table->string('original_filename')->after('user_id');
-            $table->string('mime_type')->after('original_filename');
-            $table->bigInteger('file_size')->after('mime_type');
+            // Add new columns (only the ones that don't exist in the first migration)
             $table->string('hash')->after('file_size')->nullable();
-            $table->json('metadata')->after('error_message')->nullable();
             
-            // Add indexes
-            $table->index('status');
-            $table->index('created_at');
+            // Add only new indexes (avoid duplicates)
             $table->index(['user_id', 'created_at']);
             $table->index('hash');
             
@@ -31,8 +25,6 @@ return new class extends Migration
     {
         Schema::table('audio_files', function (Blueprint $table) {
             // Remove indexes
-            $table->dropIndex(['status']);
-            $table->dropIndex(['created_at']);
             $table->dropIndex(['user_id', 'created_at']);
             $table->dropIndex(['hash']);
             
@@ -41,11 +33,7 @@ return new class extends Migration
             
             // Remove columns
             $table->dropColumn([
-                'original_filename',
-                'mime_type',
-                'file_size',
-                'hash',
-                'metadata'
+                'hash'
             ]);
         });
     }

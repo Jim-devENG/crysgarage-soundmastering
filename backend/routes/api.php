@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\AudioFileController as ApiAudioFileController;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
 use App\Http\Controllers\ChunkedUploadController;
+use Illuminate\Support\Facades\Log;
 
 // Public routes
 Route::post('/register', [AuthController::class, 'register'])->name('register');
@@ -43,7 +44,7 @@ Route::get('/test-download/{path}', function ($path) {
         'Content-Type' => $mimeType,
         'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         'Content-Length' => filesize($fullPath),
-        'Access-Control-Allow-Origin' => 'http://localhost:3000',
+        'Access-Control-Allow-Origin' => request()->header('Origin', 'http://localhost:3000'),
         'Access-Control-Allow-Methods' => 'GET, OPTIONS',
         'Access-Control-Allow-Headers' => 'Content-Type, Authorization, X-Requested-With',
         'Access-Control-Allow-Credentials' => 'true',
@@ -62,34 +63,12 @@ Route::get('/storage/{path}', function ($path) {
     
     return response()->file($fullPath, [
         'Content-Type' => $mimeType,
-        'Access-Control-Allow-Origin' => 'http://localhost:3000',
+        'Access-Control-Allow-Origin' => request()->header('Origin', 'http://localhost:3000'),
         'Access-Control-Allow-Methods' => 'GET, OPTIONS',
         'Access-Control-Allow-Headers' => 'Content-Type, Authorization, X-Requested-With',
         'Access-Control-Allow-Credentials' => 'true',
     ]);
 })->where('path', '.*');
-
-// Test route for debugging upload limits
-Route::get('/test-upload-config', function () {
-    return response()->json([
-        'php_config' => [
-            'upload_max_filesize' => ini_get('upload_max_filesize'),
-            'post_max_size' => ini_get('post_max_size'),
-            'max_execution_time' => ini_get('max_execution_time'),
-            'memory_limit' => ini_get('memory_limit'),
-            'max_file_uploads' => ini_get('max_file_uploads'),
-        ],
-        'app_config' => [
-            'max_upload_size' => config('audio.file_size.max_upload_size'),
-            'max_upload_size_kb' => config('audio.file_size.max_upload_size_kb'),
-            'supported_formats' => config('audio.supported_formats.extensions'),
-        ],
-        'server_info' => [
-            'content_length_limit' => $_SERVER['CONTENT_LENGTH'] ?? 'not set',
-            'request_method' => $_SERVER['REQUEST_METHOD'] ?? 'not set',
-        ]
-    ]);
-});
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -162,6 +141,10 @@ Route::middleware('auth:sanctum')->group(function () {
         
         // Upload audio file
         Route::post('/upload', [ApiAudioFileController::class, 'upload']);
+        
+        // Tier-specific mastering endpoints
+        Route::post('/upload/automatic', [ApiAudioFileController::class, 'uploadAutomatic']);
+        Route::post('/upload/advanced', [ApiAudioFileController::class, 'uploadAdvanced']);
         
         // Advanced mastering
         Route::post('/{audioFile}/mastering', [ApiAudioFileController::class, 'applyAdvancedMastering']);
@@ -321,6 +304,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/monitoring/queues', [MonitoringController::class, 'queueStatus']);
     Route::get('/monitoring/audio-files', [MonitoringController::class, 'audioFileStats']);
 });
+
+// Public free mastering upload route
+Route::post('/audio/upload/free', [App\Http\Controllers\Api\AudioFileController::class, 'uploadFree']);
+// Public status and download routes for free/mastered files
+Route::get('/audio/{audioFile}/status', [App\Http\Controllers\Api\AudioFileController::class, 'getStatus']);
+Route::get('/audio/{audioFile}/download', [App\Http\Controllers\Api\AudioFileController::class, 'download']);
 
 // Health check endpoints
 Route::prefix('health')->group(function () {

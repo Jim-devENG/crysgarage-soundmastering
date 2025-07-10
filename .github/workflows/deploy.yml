@@ -2,40 +2,62 @@ name: Deploy to VPS
 
 on:
   push:
-    branches: [main, master]
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Deploy to VPS
-        uses: appleboy/ssh-action@v0.1.5
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
+          username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
+          port: ${{ secrets.VPS_PORT || 22 }}
           script: |
-            cd /var/www/audio-app
-            git pull origin main
+            # Navigate to your project directory
+            cd /root/audio-app
 
-            # Update backend
+            # Pull latest changes
+            git pull origin master
+
+            # Install/update backend dependencies
             cd backend
             composer install --no-dev --optimize-autoloader
-            php artisan config:cache
-            php artisan route:cache
-            php artisan view:cache
 
-            # Update frontend
+            # Clear Laravel caches
+            php artisan config:clear
+            php artisan cache:clear
+            php artisan route:clear
+            php artisan view:clear
+
+            # Run database migrations (if any)
+            php artisan migrate --force
+
+            # Install/update frontend dependencies
             cd ../frontend
             npm install
-            npm run build
-            pm2 restart frontend
 
-            # Set permissions
-            sudo chown -R apache:apache /var/www/audio-app
-            sudo chmod -R 755 /var/www/audio-app
-            sudo chmod -R 775 /var/www/audio-app/backend/storage
+            # Build frontend
+            npm run build
+
+            # Restart backend services (adjust based on your setup)
+            # If using PM2:
+            pm2 restart laravel-backend || pm2 start "php artisan serve --host=0.0.0.0 --port=8000" --name laravel-backend
+
+            # If using systemd:
+            # sudo systemctl restart your-backend-service
+
+            # If using Apache/Nginx, just restart the web server:
+            # sudo systemctl restart apache2
+            # or
+            # sudo systemctl restart nginx
 
             echo "Deployment completed successfully!"
