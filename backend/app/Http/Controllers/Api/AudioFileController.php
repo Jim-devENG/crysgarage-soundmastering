@@ -387,6 +387,63 @@ class AudioFileController extends Controller
     }
 
     /**
+     * Free tier upload - same as automatic but with free tier restrictions
+     */
+    public function uploadFree(Request $request): \Illuminate\Http\JsonResponse
+    {
+        // 1. Check file presence
+        if (!$request->hasFile('audio')) {
+            return response()->json([
+                'message' => 'No file provided',
+                'error' => 'Please select an audio file to upload.',
+            ], 400);
+        }
+        $file = $request->file('audio');
+        // 2. Enforce 5MB size limit
+        if ($file->getSize() > 5 * 1024 * 1024) {
+            return response()->json([
+                'message' => 'File too large',
+                'error' => 'Free tier is limited to 5MB files.',
+            ], 400);
+        }
+        // 3. (Pseudo) Check user credits (implement real logic as needed)
+        // $user = $request->user();
+        // if ($user->free_credits <= 0) {
+        //     return response()->json([
+        //         'message' => 'No free credits left',
+        //         'error' => 'You have used all your free mastering credits.',
+        //     ], 403);
+        // }
+        // 4. Store file
+        $originalFilename = $file->getClientOriginalName();
+        $extension = $file->getClientOriginalExtension();
+        $filename = uniqid() . '_' . time() . '.' . $extension;
+        $storagePath = 'audio/original/' . $filename;
+        $file->storeAs('audio/original', $filename, config('audio.storage.disk', 'public'));
+        // 5. Create DB record
+        $audioFile = \App\Models\AudioFile::create([
+            'user_id' => $request->user()?->id,
+            'original_filename' => $originalFilename,
+            'original_path' => $storagePath,
+            'file_size' => $file->getSize(),
+            'mime_type' => $file->getMimeType(),
+            'status' => 'uploaded',
+            'metadata' => [
+                'upload_time' => now()->toISOString(),
+                'free_tier' => true,
+            ],
+        ]);
+        // 6. Dispatch processing job (same as automatic)
+        \App\Jobs\ProcessAudioFile::dispatch($audioFile);
+        // 7. Return response
+        return response()->json([
+            'message' => 'Free mastering upload successful',
+            'data' => $audioFile,
+            'processing_status' => 'queued',
+        ], 201);
+    }
+
+    /**
      * Get human-readable file upload error message
      */
     private function getFileErrorMessage(int $errorCode): string

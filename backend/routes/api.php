@@ -143,7 +143,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/upload', [ApiAudioFileController::class, 'upload']);
         
         // Tier-specific mastering endpoints
-        Route::post('/upload/free', [ApiAudioFileController::class, 'uploadFree']);
         Route::post('/upload/automatic', [ApiAudioFileController::class, 'uploadAutomatic']);
         Route::post('/upload/advanced', [ApiAudioFileController::class, 'uploadAdvanced']);
         
@@ -305,6 +304,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/monitoring/queues', [MonitoringController::class, 'queueStatus']);
     Route::get('/monitoring/audio-files', [MonitoringController::class, 'audioFileStats']);
 });
+
+// Public free mastering upload route
+Route::post('/audio/upload/free', [App\Http\Controllers\Api\AudioFileController::class, 'uploadFree']);
+// Public status and download routes for free/mastered files
+Route::get('/audio/{audioFile}/status', [App\Http\Controllers\Api\AudioFileController::class, 'getStatus']);
+Route::get('/audio/{audioFile}/download', [App\Http\Controllers\Api\AudioFileController::class, 'download']);
 
 // Health check endpoints
 Route::prefix('health')->group(function () {
